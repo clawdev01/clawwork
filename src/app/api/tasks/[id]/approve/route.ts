@@ -3,14 +3,16 @@ import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
 import { calculateFees } from "@/lib/crypto";
 import { releaseEscrow } from "@/lib/payments";
 import { notifyPaymentReceived } from "@/lib/matching";
+import { completeWorkflowStep } from "@/lib/workflows";
 import { eq } from "drizzle-orm";
 
 /**
  * POST /api/tasks/:id/approve
  * 
  * Poster approves completed work → triggers USDC payment to agent.
- * Platform executes the on-chain transfer and pays gas.
- * Agent receives USDC minus 8% platform fee.
+ * If task is part of a workflow, advances to the next step automatically.
+ * 
+ * Optional body: { output: "..." } — step output for workflow chaining
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,6 +20,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const agent = await authenticateAgent(request);
     if (!agent) return jsonError("Unauthorized", 401);
+
+    // Parse body (optional — may contain workflow output)
+    const body = await request.json().catch(() => ({}));
 
     const task = await db.query.tasks.findFirst({
       where: eq(schema.tasks.id, id),
@@ -43,14 +48,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     let paymentResult: { onChain: boolean; txHash?: string; error?: string } = { onChain: false };
 
     if (assignedAgent.walletAddress && task.escrowTxHash) {
-      // Real on-chain payment — platform pays gas
       const release = await releaseEscrow(id, assignedAgent.walletAddress, task.budgetUsdc);
-
       if (release.success) {
         paymentResult = { onChain: true, txHash: release.txHash };
       } else {
-        // Payment failed but we still mark task completed
-        // Record the failure, handle manually
         paymentResult = { onChain: false, error: release.error };
         console.error(`Escrow release failed for task ${id}:`, release.error);
       }
@@ -70,7 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       updatedAt: now,
     }).where(eq(schema.agents.id, assignedAgent.id));
 
-    // If on-chain payment wasn't done (no wallet or no escrow), record intent
+    // Record transaction if on-chain payment wasn't done
     if (!paymentResult.onChain && !paymentResult.txHash) {
       const { v4: uuidv4 } = await import("uuid");
       await db.insert(schema.transactions).values({
@@ -84,6 +85,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         status: paymentResult.error ? "failed" : "pending",
         createdAt: now,
       });
+    }
+
+    // 🔗 WORKFLOW ADVANCEMENT — if this task is part of a workflow, advance to next step
+    let workflowInfo: Record<string, unknown> | undefined;
+    const stepOutput = body.output || body.workflowOutput || "Task completed successfully.";
+    const workflowResult = await completeWorkflowStep(id, stepOutput);
+    
+    if (workflowResult.advanced || workflowResult.workflowCompleted) {
+      workflowInfo = {
+        advanced: workflowResult.advanced,
+        workflowCompleted: workflowResult.workflowCompleted,
+        nextTaskId: workflowResult.nextTaskId,
+      };
     }
 
     // Notify agent about payment
@@ -104,6 +118,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         gasPaidByPlatform: true,
         error: paymentResult.error,
       },
+      ...(workflowInfo ? { workflow: workflowInfo } : {}),
     });
 
   } catch (error) {
