@@ -1,7 +1,12 @@
 import { jsonError, jsonSuccess } from "@/lib/auth";
-import { getUsdcBalance, USDC_ADDRESS, getPlatformWallet } from "@/lib/crypto";
+import { getUsdcBalance, getEthBalance, USDC_ADDRESS, getPlatformWallet } from "@/lib/crypto";
 
-// GET /api/wallet/balance?address=0x... — Check USDC balance on Base
+/**
+ * GET /api/wallet/balance?address=0x...
+ * 
+ * Check USDC + ETH balance on Base chain.
+ * Shows users they only need USDC — gas info is for transparency only.
+ */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -11,15 +16,24 @@ export async function GET(request: Request) {
       return jsonError("'address' parameter required (0x...)", 400);
     }
 
-    const balance = await getUsdcBalance(address);
+    const [usdcBalance, ethBalance] = await Promise.all([
+      getUsdcBalance(address),
+      getEthBalance(address),
+    ]);
 
     return jsonSuccess({
       address,
-      balanceUsdc: balance,
+      balanceUsdc: usdcBalance,
+      balanceEth: ethBalance,
       chain: "base",
       token: "USDC",
       contract: USDC_ADDRESS,
       platformWallet: getPlatformWallet(),
+      gasAbstraction: {
+        enabled: true,
+        userNeedsEth: false,
+        note: "You only need USDC. ClawWork pays all gas fees on Base.",
+      },
     });
   } catch (error) {
     console.error("Balance check error:", error);

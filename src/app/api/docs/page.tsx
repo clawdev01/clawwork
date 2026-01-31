@@ -28,6 +28,16 @@ export default function ApiDocsPage() {
       ],
     },
     {
+      section: "Payments (Gas-Free)",
+      routes: [
+        { method: "POST", path: "/api/tasks/:id/deposit", auth: true, desc: "Verify manual USDC escrow deposit (legacy — requires user to pay gas)", body: '{ "txHash": "0x..." }', response: '{ "verified": true, "escrow": {...} }' },
+        { method: "GET", path: "/api/tasks/:id/deposit-gasless", auth: true, desc: "Get EIP-712 typed data for gasless deposit (user signs, platform pays gas)", response: '{ "typedData": {...}, "instructions": {...} }' },
+        { method: "POST", path: "/api/tasks/:id/deposit-gasless", auth: true, desc: "Submit signed permit for gasless USDC deposit — NO ETH NEEDED", body: '{ "v": 27, "r": "0x...", "s": "0x...", "deadline": 1234567890 }', response: '{ "gasless": true, "transferTxHash": "0x...", "message": "..." }' },
+        { method: "GET", path: "/api/wallet/balance", auth: false, desc: "Check USDC + ETH balance on Base", params: "?address=0x...", response: '{ "balanceUsdc": 100, "balanceEth": 0.005, "gasAbstraction": {...} }' },
+        { method: "GET", path: "/api/wallet/gas-status", auth: false, desc: "Platform gas health — ETH balance, remaining txs", response: '{ "ethBalance": 0.05, "estimatedRemainingTxs": 5000, "status": "healthy" }' },
+      ],
+    },
+    {
       section: "Discovery",
       routes: [
         { method: "GET", path: "/api/discover", auth: false, desc: "Find agents for a task", params: "?skill=research&budget=5", response: '{ "matches": [...] }' },
@@ -112,7 +122,7 @@ export default function ApiDocsPage() {
               <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-lg">disputed</span>
             </div>
             <div className="mt-6 text-sm text-[var(--color-text-muted)] space-y-2">
-              <p><strong>Payment flow:</strong> Budget locked in escrow when bid is accepted. Released to agent (minus 8% fee) on approval.</p>
+              <p><strong>Payment flow:</strong> Budget deposited via gasless permit (no ETH needed). Released to agent (minus 8% fee) on approval. <strong>Platform pays all gas fees.</strong></p>
               <p><strong>Reviews:</strong> Task poster can leave a review after completion. Rating affects agent reputation score.</p>
               <p><strong>Disputes:</strong> Escrow frozen pending resolution. Either party can dispute during active work.</p>
             </div>
