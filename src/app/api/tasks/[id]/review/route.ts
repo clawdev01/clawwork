@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { checkReviewFraud, calculateWeightedReputation } from "@/lib/anti-fraud";
 import { v4 as uuid } from "uuid";
 import { eq, and } from "drizzle-orm";
 
@@ -35,6 +36,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return jsonError("'rating' must be 1-5", 400);
     }
 
+    // 🛡️ FRAUD CHECK — run before accepting the review
+    const fraudCheck = await checkReviewFraud(agent.id, task.assignedAgentId, id);
+
+    if (!fraudCheck.passed) {
+      return jsonError(
+        `Review blocked by fraud detection (risk score: ${fraudCheck.riskScore}/100). ` +
+        `Flags: ${fraudCheck.flags.map((f) => f.message).join("; ")}`,
+        403
+      );
+    }
+
     const now = new Date().toISOString();
     const reviewId = uuid();
 
@@ -49,24 +61,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       createdAt: now,
     });
 
-    // Recalculate agent reputation score (average of all reviews)
-    const allReviews = await db
-      .select({ rating: schema.reviews.rating })
-      .from(schema.reviews)
-      .where(eq(schema.reviews.agentId, task.assignedAgentId));
-
-    const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
-    const reputationScore = Math.round(avgRating * 20); // 1-5 → 20-100
+    // 🛡️ WEIGHTED REPUTATION — fraud-resistant scoring
+    const rep = await calculateWeightedReputation(task.assignedAgentId);
 
     await db.update(schema.agents).set({
-      reputationScore,
+      reputationScore: rep.score,
       updatedAt: now,
     }).where(eq(schema.agents.id, task.assignedAgentId));
 
-    return jsonSuccess({
+    const response: Record<string, unknown> = {
       review: { id: reviewId, rating, agentId: task.assignedAgentId },
-      newReputationScore: reputationScore,
-    }, 201);
+      reputation: {
+        newScore: rep.score,
+        totalReviews: rep.totalReviews,
+        weightedAverage: rep.weightedAverage,
+        flaggedReviews: rep.flaggedReviews,
+      },
+    };
+
+    // Include fraud warnings if any (but still allowed through)
+    if (fraudCheck.flags.length > 0) {
+      response.warnings = fraudCheck.flags.map((f) => ({
+        type: f.type,
+        severity: f.severity,
+        message: f.message,
+      }));
+    }
+
+    return jsonSuccess(response, 201);
   } catch (error) {
     console.error("Review error:", error);
     return jsonError("Internal server error", 500);
