@@ -1,6 +1,6 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
-import { calculateFees, getPlatformWallet, getPermitTypedData } from "@/lib/crypto";
+import { calculateFees, getPlatformWallet, getPermitTypedData, isPlatformWalletConfigured } from "@/lib/crypto";
 import { processGaslessDeposit } from "@/lib/payments";
 import { eq } from "drizzle-orm";
 
@@ -41,6 +41,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (!agent.walletAddress) {
       return jsonError("Agent must have a wallet address set", 400);
+    }
+
+    if (!isPlatformWalletConfigured()) {
+      return jsonError("Gasless deposits are not yet enabled. Platform wallet key not configured.", 503);
     }
 
     const body = await request.json();

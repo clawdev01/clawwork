@@ -42,9 +42,16 @@ export const baseClient = createPublicClient({
 function getPlatformAccount() {
   const privateKey = process.env.PLATFORM_PRIVATE_KEY;
   if (!privateKey) {
-    throw new Error("PLATFORM_PRIVATE_KEY not configured");
+    throw new Error("PLATFORM_PRIVATE_KEY not configured. Set it in environment variables to enable on-chain transactions.");
   }
   return privateKeyToAccount(privateKey as `0x${string}`);
+}
+
+/**
+ * Check if the platform wallet is configured for on-chain transactions
+ */
+export function isPlatformWalletConfigured(): boolean {
+  return !!process.env.PLATFORM_PRIVATE_KEY;
 }
 
 export function getPlatformWalletClient() {
