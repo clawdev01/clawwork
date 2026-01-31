@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { notifyBidAccepted } from "@/lib/matching";
 import { eq, and, ne } from "drizzle-orm";
 
 // POST /api/tasks/:id/accept — Accept a bid
@@ -61,6 +62,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .update(schema.tasks)
       .set({ status: "in_progress", assignedAgentId: bid.agentId, updatedAt: now })
       .where(eq(schema.tasks.id, id));
+
+    // Notify the agent via webhook + in-app notification
+    notifyBidAccepted(id, bidId, bid.agentId).catch((err) =>
+      console.error("Bid notification error:", err)
+    );
 
     return jsonSuccess({
       task: { id, status: "in_progress", assignedAgentId: bid.agentId },

@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { processNewTask } from "@/lib/matching";
 import { v4 as uuid } from "uuid";
 import { eq, desc } from "drizzle-orm";
 
@@ -46,7 +47,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { title, description, category, budgetUsdc, deadline, requiredSkills } = body;
+    const {
+      title,
+      description,
+      category,
+      budgetUsdc,
+      deadline,
+      requiredSkills,
+      // Auto-accept settings
+      autoAccept,
+      autoAcceptMinReputation,
+      autoAcceptMaxBudget,
+      autoAcceptPreferredSkills,
+    } = body;
 
     // Validate
     if (!title || typeof title !== "string") {
@@ -72,22 +85,58 @@ export async function POST(request: Request) {
       budgetUsdc,
       deadline: deadline || null,
       requiredSkills: JSON.stringify(requiredSkills || []),
+      autoAccept: autoAccept ? 1 : 0,
+      autoAcceptMinReputation: autoAcceptMinReputation || null,
+      autoAcceptMaxBudget: autoAcceptMaxBudget || null,
+      autoAcceptPreferredSkills: autoAcceptPreferredSkills ? JSON.stringify(autoAcceptPreferredSkills) : null,
       createdAt: now,
       updatedAt: now,
     });
 
-    return jsonSuccess(
-      {
-        task: {
-          id,
-          title,
-          budgetUsdc,
-          status: "open",
-          url: `https://clawwork.io/tasks/${id}`,
-        },
-      },
-      201
+    // 🔥 MATCHING ENGINE: find agents, auto-bid, auto-accept
+    // Runs async so task creation returns fast
+    const matchingPromise = processNewTask(id).catch((err) =>
+      console.error("Matching engine error:", err)
     );
+
+    // Wait briefly for instant matches (auto-accept can happen in <100ms)
+    const matchResult = await Promise.race([
+      matchingPromise,
+      new Promise((resolve) => setTimeout(() => resolve(null), 2000)), // 2s timeout
+    ]);
+
+    const response: Record<string, unknown> = {
+      task: {
+        id,
+        title,
+        budgetUsdc,
+        status: "open",
+        autoAccept: !!autoAccept,
+        url: `https://clawwork.io/tasks/${id}`,
+      },
+    };
+
+    if (matchResult && typeof matchResult === "object") {
+      const mr = matchResult as any;
+      response.matching = {
+        matchedAgents: mr.matchedAgents,
+        autoBidsPlaced: mr.autoBidsPlaced,
+        autoAccepted: mr.autoAccepted,
+        webhooksSent: mr.webhooksSent,
+        notificationsCreated: mr.notificationsCreated,
+      };
+
+      if (mr.autoAccepted) {
+        response.task = {
+          ...(response.task as object),
+          status: "in_progress",
+          assignedAgentId: mr.acceptedAgentId,
+        };
+        response.message = "Task created and auto-matched with an agent! Work is starting now.";
+      }
+    }
+
+    return jsonSuccess(response, 201);
   } catch (error) {
     console.error("Create task error:", error);
     return jsonError("Internal server error", 500);

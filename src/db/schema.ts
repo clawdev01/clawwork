@@ -19,6 +19,9 @@ export const agents = sqliteTable("agents", {
   totalEarnedUsdc: real("total_earned_usdc").default(0),
   apiKey: text("api_key").notNull(), // hashed API key for auth
   apiKeyPrefix: text("api_key_prefix").notNull(), // first 8 chars for identification
+  webhookUrl: text("webhook_url"), // URL to notify agent of matching tasks
+  webhookSecret: text("webhook_secret"), // HMAC secret for webhook verification
+  maxConcurrentTasks: integer("max_concurrent_tasks").default(5), // capacity limit
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -51,6 +54,11 @@ export const tasks = sqliteTable("tasks", {
   escrowTxHash: text("escrow_tx_hash"),
   completionTxHash: text("completion_tx_hash"),
   bidCount: integer("bid_count").default(0),
+  // Auto-accept settings (poster sets these when creating task)
+  autoAccept: integer("auto_accept").default(0), // 1 = enabled
+  autoAcceptMinReputation: real("auto_accept_min_reputation"), // min reputation score
+  autoAcceptMaxBudget: real("auto_accept_max_budget"), // accept if bid <= this amount
+  autoAcceptPreferredSkills: text("auto_accept_preferred_skills"), // JSON array — bonus matching
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -64,6 +72,7 @@ export const bids = sqliteTable("bids", {
   proposal: text("proposal").notNull(), // why this agent is right for the job
   estimatedHours: real("estimated_hours"),
   status: text("status").default("pending"), // pending, accepted, rejected, withdrawn
+  autoBid: integer("auto_bid").default(0), // 1 = submitted by auto-bid rule
   createdAt: text("created_at").notNull(),
 });
 
@@ -90,5 +99,55 @@ export const transactions = sqliteTable("transactions", {
   chain: text("chain").default("base"), // base, ethereum, arbitrum
   type: text("type").notNull(), // escrow_deposit, escrow_release, refund, platform_fee
   status: text("status").default("pending"), // pending, confirmed, failed
+  createdAt: text("created_at").notNull(),
+});
+
+// ============ AUTO-BID RULES ============
+export const autoBidRules = sqliteTable("auto_bid_rules", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").notNull().references(() => agents.id),
+  name: text("name"), // friendly name for the rule
+  enabled: integer("enabled").default(1), // 1 = active
+  // Matching criteria
+  categories: text("categories"), // JSON array — match these task categories
+  skills: text("skills"), // JSON array — match tasks requiring any of these skills
+  minBudgetUsdc: real("min_budget_usdc"), // only bid if budget >= this
+  maxBudgetUsdc: real("max_budget_usdc"), // only bid if budget <= this
+  // Bid settings
+  bidStrategy: text("bid_strategy").default("match_budget"), // match_budget, undercut_10, fixed_rate, hourly_calc
+  fixedBidUsdc: real("fixed_bid_usdc"), // for fixed_rate strategy
+  bidMessage: text("bid_message"), // template proposal message (supports {task_title}, {skills}, {budget} placeholders)
+  // Capacity control
+  maxActiveTasks: integer("max_active_tasks").default(3), // don't bid if agent has >= this many active tasks
+  // Stats
+  totalBidsPlaced: integer("total_bids_placed").default(0),
+  totalBidsAccepted: integer("total_bids_accepted").default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// ============ WEBHOOK EVENTS ============
+export const webhookEvents = sqliteTable("webhook_events", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").notNull().references(() => agents.id),
+  eventType: text("event_type").notNull(), // task_match, bid_accepted, bid_rejected, task_assigned, payment_received
+  payload: text("payload").notNull(), // JSON payload sent
+  status: text("status").default("pending"), // pending, delivered, failed
+  attempts: integer("attempts").default(0),
+  lastAttemptAt: text("last_attempt_at"),
+  deliveredAt: text("delivered_at"),
+  error: text("error"),
+  createdAt: text("created_at").notNull(),
+});
+
+// ============ NOTIFICATIONS (in-app, for agents without webhooks) ============
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").notNull().references(() => agents.id),
+  type: text("type").notNull(), // task_match, bid_accepted, bid_rejected, task_assigned, payment_received, auto_bid_placed
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  taskId: text("task_id").references(() => tasks.id),
+  read: integer("read").default(0), // 0 = unread, 1 = read
   createdAt: text("created_at").notNull(),
 });

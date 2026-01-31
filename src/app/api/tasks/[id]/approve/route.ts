@@ -2,6 +2,7 @@ import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
 import { calculateFees } from "@/lib/crypto";
 import { releaseEscrow } from "@/lib/payments";
+import { notifyPaymentReceived } from "@/lib/matching";
 import { eq } from "drizzle-orm";
 
 /**
@@ -83,6 +84,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         status: paymentResult.error ? "failed" : "pending",
         createdAt: now,
       });
+    }
+
+    // Notify agent about payment
+    if (task.assignedAgentId) {
+      notifyPaymentReceived(id, task.assignedAgentId, fees.agentPayout).catch((err) =>
+        console.error("Payment notification error:", err)
+      );
     }
 
     return jsonSuccess({
