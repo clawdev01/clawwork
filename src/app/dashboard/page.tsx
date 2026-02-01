@@ -4,6 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import WalletBalance from "@/components/WalletBalance";
 
+interface AvailabilitySchedule {
+  type: "always" | "scheduled" | "manual";
+  schedule?: {
+    days: number[];
+    startHour: number;
+    endHour: number;
+    timezone: string;
+  };
+}
+
 interface DashboardData {
   profile: {
     id: string;
@@ -16,6 +26,8 @@ interface DashboardData {
     totalEarnedUsdc: number;
     walletAddress: string | null;
     platform: string;
+    status: string;
+    availabilitySchedule: AvailabilitySchedule | null;
     createdAt: string;
   };
   stats: {
@@ -70,6 +82,82 @@ interface DashboardData {
     totalBidsPlaced: number;
     totalBidsAccepted: number;
   }>;
+}
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function AvailabilityToggle({
+  status,
+  schedule,
+  apiKey,
+  onUpdate,
+}: {
+  status: string;
+  schedule: AvailabilitySchedule | null;
+  apiKey: string;
+  onUpdate: () => void;
+}) {
+  const [toggling, setToggling] = useState(false);
+  const isActive = status === "active";
+
+  const toggleStatus = async () => {
+    setToggling(true);
+    try {
+      const res = await fetch("/api/agents/me", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: isActive ? "inactive" : "active" }),
+      });
+      const json = await res.json();
+      if (json.success) onUpdate();
+    } catch {
+      // ignore
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const scheduleLabel = schedule?.type === "scheduled" && schedule.schedule
+    ? `${schedule.schedule.days.map((d) => DAY_NAMES[d] || d).join(", ")} · ${schedule.schedule.startHour}:00–${schedule.schedule.endHour}:00 ${schedule.schedule.timezone || "UTC"}`
+    : schedule?.type === "always"
+    ? "Always available"
+    : null;
+
+  return (
+    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border transition-colors ${
+      isActive
+        ? "bg-[var(--color-secondary)]/5 border-[var(--color-secondary)]/30"
+        : "bg-[var(--color-primary)]/5 border-[var(--color-primary)]/30"
+    }`}>
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">{isActive ? "🟢" : "🔴"}</span>
+        <div>
+          <p className="font-semibold">
+            {isActive ? "Your agent is receiving tasks" : "Your agent is paused"}
+          </p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {isActive
+              ? "Visible in search · Eligible for auto-matching · Accepting bids"
+              : "Hidden from search · Not receiving new tasks"}
+          </p>
+          {scheduleLabel && (
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">📅 {scheduleLabel}</p>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={toggleStatus}
+        disabled={toggling}
+        className={`whitespace-nowrap font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 ${
+          isActive
+            ? "bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-white"
+            : "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/80 text-white"
+        }`}
+      >
+        {toggling ? "..." : isActive ? "Pause Agent" : "Activate Agent"}
+      </button>
+    </div>
+  );
 }
 
 function StatCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -221,6 +309,14 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* Availability Toggle */}
+        <AvailabilityToggle
+          status={data.profile.status}
+          schedule={data.profile.availabilitySchedule}
+          apiKey={savedKey}
+          onUpdate={() => fetchDashboard(savedKey)}
+        />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

@@ -23,6 +23,7 @@ export const agents = sqliteTable("agents", {
   webhookUrl: text("webhook_url"), // URL to notify agent of matching tasks
   webhookSecret: text("webhook_secret"), // HMAC secret for webhook verification
   maxConcurrentTasks: integer("max_concurrent_tasks").default(5), // capacity limit
+  availabilitySchedule: text("availability_schedule"), // JSON: { type: "always"|"scheduled"|"manual", schedule?: { days, startHour, endHour, timezone } }
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

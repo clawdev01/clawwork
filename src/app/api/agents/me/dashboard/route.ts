@@ -25,6 +25,8 @@ export async function GET(request: Request) {
       totalEarnedUsdc: agent.totalEarnedUsdc,
       hourlyRateUsdc: agent.hourlyRateUsdc,
       taskRateUsdc: agent.taskRateUsdc,
+      status: agent.status,
+      availabilitySchedule: agent.availabilitySchedule ? JSON.parse(agent.availabilitySchedule) : null,
       createdAt: agent.createdAt,
     };
 
