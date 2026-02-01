@@ -69,8 +69,6 @@ function NewTaskForm() {
   // Auth
   const [authMode, setAuthMode] = useState<"wallet" | "apikey">("wallet");
 
-  const categories = ["research", "coding", "design", "data", "writing", "automation", "other"];
-
   const deadlineOptions: { value: DeadlineOption; label: string; icon: string }[] = [
     { value: "asap", label: "ASAP", icon: "⚡" },
     { value: "1h", label: "1 hour", icon: "⏱️" },
@@ -170,22 +168,25 @@ function NewTaskForm() {
     return withExamples.length > 0 ? withExamples : selectedAgentPortfolio;
   }, [selectedAgentPortfolio]);
 
-  // Auto-fill category from agent skills when agent is pre-selected
+  // Auto-derive category from agent skills OR required skills
+  const skillCategoryMap: Record<string, string> = {
+    research: "research", analysis: "research", summarization: "research", "market-research": "research", "competitive-analysis": "research",
+    coding: "coding", typescript: "coding", python: "coding", solidity: "coding", "smart-contracts": "coding", "api-development": "coding",
+    design: "design", "ui-ux": "design", figma: "design", "responsive-design": "design",
+    "data-analysis": "data", sql: "data", statistics: "data", visualization: "data", "machine-learning": "data",
+    writing: "writing", copywriting: "writing", "content-creation": "writing", seo: "writing", "social-media": "writing",
+    automation: "automation", "api-integration": "automation", devops: "automation", scripting: "automation", monitoring: "automation",
+  };
   useEffect(() => {
-    if (!selectedAgent || category !== "other") return;
-    const skillCategoryMap: Record<string, string> = {
-      research: "research", analysis: "research", summarization: "research",
-      coding: "coding", typescript: "coding", python: "coding", solidity: "coding",
-      design: "design", "ui-ux": "design", figma: "design",
-      "data-analysis": "data", sql: "data", statistics: "data",
-      writing: "writing", copywriting: "writing", "content-creation": "writing", seo: "writing",
-      automation: "automation", "api-integration": "automation",
-    };
-    for (const skill of selectedAgent.skills) {
+    // Derive from agent skills first, then from required skills
+    const allSkills = selectedAgent ? selectedAgent.skills : parsedSkills;
+    if (allSkills.length === 0) { setCategory("other"); return; }
+    for (const skill of allSkills) {
       const cat = skillCategoryMap[skill.toLowerCase()];
-      if (cat) { setCategory(cat); break; }
+      if (cat) { setCategory(cat); return; }
     }
-  }, [selectedAgent]);
+    setCategory("other");
+  }, [selectedAgent, parsedSkills]);
 
   // Compute deadline ISO string from option
   const computeDeadline = (): string | undefined => {
@@ -548,35 +549,24 @@ function NewTaskForm() {
                 </div>
               )}
 
-              {/* ═══ Category & Budget ═══ */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Category</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  >
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c.charAt(0).toUpperCase() + c.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Budget (USDC) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                    placeholder="5.00"
-                    required
-                  />
-                </div>
+              {/* ═══ Budget ═══ */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Budget (USDC) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  placeholder="5.00"
+                  required
+                />
+                {selectedAgent?.taskRateUsdc && !budget && (
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
+                    💡 This agent&apos;s rate is <span className="text-[var(--color-secondary)] font-medium">${selectedAgent.taskRateUsdc}/task</span>
+                  </p>
+                )}
               </div>
 
               {/* ═══ Required Skills ═══ */}
