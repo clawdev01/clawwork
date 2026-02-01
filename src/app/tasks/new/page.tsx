@@ -184,6 +184,65 @@ function NewTaskForm() {
     setCategory("other");
   }, [selectedAgent, parsedSkills]);
 
+  // Dynamic input label/placeholder based on agent type
+  const { inputLabel, inputPlaceholder, inputHint } = useMemo(() => {
+    if (!selectedAgent) {
+      return {
+        inputLabel: "Description",
+        inputPlaceholder: "Describe exactly what you need. Be specific about deliverables, format, and quality expectations.",
+        inputHint: "",
+      };
+    }
+    const sk = selectedAgent.skills.map(s => s.toLowerCase());
+    if (sk.some(s => ["coding", "typescript", "python", "solidity", "smart-contracts"].includes(s))) {
+      return {
+        inputLabel: "What to build",
+        inputPlaceholder: "Describe the feature, function, or code you need. Include language, framework, expected behavior, and any constraints.\n\nYou can paste existing code here too.",
+        inputHint: "Be specific about inputs, outputs, and edge cases — agents deliver exactly what you describe",
+      };
+    }
+    if (sk.some(s => ["design", "ui-ux", "figma", "illustration"].includes(s))) {
+      return {
+        inputLabel: "Design brief",
+        inputPlaceholder: "Describe what you need designed. Include style preferences, colors, dimensions, use case, and reference links if any.",
+        inputHint: "Link reference images or describe the style you want — the more specific, the better",
+      };
+    }
+    if (sk.some(s => ["research", "analysis", "market-research"].includes(s))) {
+      return {
+        inputLabel: "Research brief",
+        inputPlaceholder: "What topic needs researching? Include scope, depth, specific questions to answer, and preferred format for the deliverable.",
+        inputHint: "Specify what format you want (report, bullet points, data table, etc.)",
+      };
+    }
+    if (sk.some(s => ["writing", "copywriting", "content-creation", "seo"].includes(s))) {
+      return {
+        inputLabel: "Content brief",
+        inputPlaceholder: "Describe the content you need. Include topic, tone, target audience, word count, and any SEO keywords or brand guidelines.",
+        inputHint: "Share your brand voice, target audience, or examples of content you like",
+      };
+    }
+    if (sk.some(s => ["data-analysis", "sql", "statistics", "visualization"].includes(s))) {
+      return {
+        inputLabel: "Data & requirements",
+        inputPlaceholder: "Describe the analysis needed. Include data source (URL/file), questions to answer, preferred visualization types, and output format.",
+        inputHint: "Paste data URLs or describe where the data lives — agents can fetch from APIs too",
+      };
+    }
+    if (sk.some(s => ["automation", "api-integration", "devops"].includes(s))) {
+      return {
+        inputLabel: "What to automate",
+        inputPlaceholder: "Describe the process to automate. Include trigger events, data sources, expected output, and any APIs or services involved.",
+        inputHint: "Include API endpoints, credentials format, and expected frequency if recurring",
+      };
+    }
+    return {
+      inputLabel: "Task details",
+      inputPlaceholder: "Describe exactly what you need done. Be specific about inputs, deliverables, format, and quality expectations.",
+      inputHint: "",
+    };
+  }, [selectedAgent]);
+
   // Compute deadline ISO string from option
   const computeDeadline = (): string | undefined => {
     if (deadlineOption === "asap") return undefined;
@@ -374,31 +433,26 @@ function NewTaskForm() {
                   <span className="w-2 h-2 rounded-full bg-[var(--color-secondary)]" />
                   Wallet connected
                 </div>
+              ) : isConnected ? (
+                <button
+                  type="button"
+                  onClick={signIn}
+                  className="w-full bg-[var(--color-secondary)] hover:brightness-110 text-black font-medium py-3 rounded-xl transition-all text-sm"
+                >
+                  🔐 Sign in to continue
+                </button>
               ) : (
-                <div className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-xl p-5">
-                  <p className="text-sm font-medium mb-3">Connect your wallet to post a task</p>
-                  {isConnected ? (
+                <ConnectKitButton.Custom>
+                  {({ show }) => (
                     <button
                       type="button"
-                      onClick={signIn}
-                      className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
+                      onClick={show}
+                      className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors text-sm"
                     >
-                      Sign In with Wallet
+                      🔗 Connect Wallet to post a task
                     </button>
-                  ) : (
-                    <ConnectKitButton.Custom>
-                      {({ show }) => (
-                        <button
-                          type="button"
-                          onClick={show}
-                          className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
-                        >
-                          Connect Wallet
-                        </button>
-                      )}
-                    </ConnectKitButton.Custom>
                   )}
-                </div>
+                </ConnectKitButton.Custom>
               )}
 
               {/* ═══ Title ═══ */}
@@ -409,22 +463,33 @@ function NewTaskForm() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="e.g., Research competitor landscape for DeFi lending"
+                  placeholder={selectedAgent
+                    ? `e.g., What do you need ${agentDisplayName} to do?`
+                    : "e.g., Research competitor landscape for DeFi lending"
+                  }
                   required
                 />
               </div>
 
-              {/* ═══ Description ═══ */}
+              {/* ═══ Input ═══ */}
               <div>
-                <label className="block text-sm font-medium mb-2">Description *</label>
+                <label className="block text-sm font-medium mb-2">
+                  {inputLabel} *
+                </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={6}
-                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="Describe exactly what you need. Be specific about deliverables, format, and quality expectations."
+                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)] font-mono"
+                  placeholder={inputPlaceholder}
                   required
                 />
+                {inputHint && (
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1.5 flex items-start gap-1">
+                    <span>💡</span>
+                    <span>{inputHint}</span>
+                  </p>
+                )}
               </div>
 
               {/* ═══ Portfolio Writing Guide ═══ */}

@@ -13,10 +13,12 @@ export const sessionOptions: SessionOptions = {
     process.env.SESSION_SECRET ||
     "clawwork-dev-secret-must-be-at-least-32-chars-long!!",
   cookieName: "clawwork-session",
+  ttl: 60 * 60 * 24 * 7, // 7 days
   cookieOptions: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     sameSite: "lax" as const,
+    maxAge: 60 * 60 * 24 * 7, // 7 days
   },
 };
 
