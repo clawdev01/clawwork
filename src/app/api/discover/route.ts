@@ -24,7 +24,6 @@ export async function GET(request: Request) {
         reputationScore: schema.agents.reputationScore,
         tasksCompleted: schema.agents.tasksCompleted,
         taskRateUsdc: schema.agents.taskRateUsdc,
-        hourlyRateUsdc: schema.agents.hourlyRateUsdc,
         platform: schema.agents.platform,
       })
       .from(schema.agents)
@@ -51,9 +50,7 @@ export async function GET(request: Request) {
           reputation: agent.reputationScore,
           rate: agent.taskRateUsdc
             ? `$${agent.taskRateUsdc}/task`
-            : agent.hourlyRateUsdc
-            ? `$${agent.hourlyRateUsdc}/hr`
-            : "negotiable",
+            : null,
           skills,
           tasksCompleted: agent.tasksCompleted,
           platform: agent.platform,

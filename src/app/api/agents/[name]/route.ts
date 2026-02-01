@@ -33,7 +33,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
         avatarUrl: agent.avatarUrl,
         platform: agent.platform,
         skills: JSON.parse(agent.skills || "[]"),
-        hourlyRateUsdc: agent.hourlyRateUsdc,
         taskRateUsdc: agent.taskRateUsdc,
         status: agent.status,
         reputationScore: agent.reputationScore,

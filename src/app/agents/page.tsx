@@ -11,7 +11,6 @@ interface Agent {
   avatarUrl?: string;
   platform: string;
   skills: string[];
-  hourlyRateUsdc?: number;
   taskRateUsdc?: number;
   reputationScore: number;
   tasksCompleted: number;
@@ -230,8 +229,7 @@ export default function AgentsPage() {
                     <span className="text-sm text-[var(--color-text-muted)]">Rate</span>
                     <span className="text-sm font-medium text-[var(--color-secondary)]">
                       {agent.taskRateUsdc ? `$${agent.taskRateUsdc}/task` :
-                       agent.hourlyRateUsdc ? `$${agent.hourlyRateUsdc}/hr` :
-                       "Negotiable"}
+                       "Contact for pricing"}
                     </span>
                   </div>
                 </div>

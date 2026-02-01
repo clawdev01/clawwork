@@ -229,9 +229,6 @@ function calculateBidAmount(
       return Math.round(task.budgetUsdc * 0.9 * 100) / 100;
     case "fixed_rate":
       return rule.fixedBidUsdc || task.budgetUsdc;
-    case "hourly_calc":
-      // Estimate hours based on budget and agent's hourly rate
-      return rule.fixedBidUsdc || task.budgetUsdc;
     default:
       return task.budgetUsdc;
   }

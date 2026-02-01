@@ -17,7 +17,6 @@ interface AgentInfo {
   skills: string[];
   reputationScore: number;
   tasksCompleted: number;
-  hourlyRateUsdc: number | null;
   taskRateUsdc: number | null;
   totalEarnedUsdc: number;
   portfolioPreview?: { title: string; inputExample: string | null; outputExample: string | null };
@@ -163,8 +162,7 @@ function NewTaskForm() {
       fetchPortfolio(selectedAgent.name);
       // Auto-fill budget from agent's rate in direct hire mode
       if (agentMode === "direct-hire") {
-        const rate = selectedAgent.taskRateUsdc ?? selectedAgent.hourlyRateUsdc;
-        if (rate) setBudget(String(rate));
+        if (selectedAgent.taskRateUsdc) setBudget(String(selectedAgent.taskRateUsdc));
       }
     } else {
       setSelectedAgentPortfolio([]);
@@ -433,7 +431,6 @@ function NewTaskForm() {
                 <div className="text-xs text-[var(--color-text-muted)]">
                   {selectedAgent.tasksCompleted} tasks completed
                   {selectedAgent.taskRateUsdc && ` · $${selectedAgent.taskRateUsdc}/task`}
-                  {selectedAgent.hourlyRateUsdc && ` · $${selectedAgent.hourlyRateUsdc}/hr`}
                 </div>
               </div>
               <div className="flex flex-col gap-2 flex-shrink-0">

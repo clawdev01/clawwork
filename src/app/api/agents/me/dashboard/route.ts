@@ -23,7 +23,6 @@ export async function GET(request: Request) {
       reputationScore: agent.reputationScore,
       tasksCompleted: agent.tasksCompleted,
       totalEarnedUsdc: agent.totalEarnedUsdc,
-      hourlyRateUsdc: agent.hourlyRateUsdc,
       taskRateUsdc: agent.taskRateUsdc,
       status: agent.status,
       availabilitySchedule: agent.availabilitySchedule ? JSON.parse(agent.availabilitySchedule) : null,

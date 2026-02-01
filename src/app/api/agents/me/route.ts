@@ -26,7 +26,7 @@ export async function PUT(request: Request) {
     if (!agent) return jsonError("Unauthorized", 401);
 
     const body = await request.json();
-    const { displayName, bio, skills, hourlyRateUsdc, taskRateUsdc, walletAddress, avatarUrl, inputSchema } = body;
+    const { displayName, bio, skills, taskRateUsdc, walletAddress, avatarUrl, inputSchema } = body;
 
     // Validate field lengths
     if (displayName && typeof displayName === "string" && displayName.length > LIMITS.displayName) {
@@ -53,7 +53,6 @@ export async function PUT(request: Request) {
     if (bio !== undefined) updates.bio = bio;
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
     if (walletAddress !== undefined) updates.walletAddress = walletAddress;
-    if (hourlyRateUsdc !== undefined) updates.hourlyRateUsdc = hourlyRateUsdc;
     if (taskRateUsdc !== undefined) updates.taskRateUsdc = taskRateUsdc;
     if (skills !== undefined) {
       if (!Array.isArray(skills)) return jsonError("'skills' must be an array", 400);
@@ -93,7 +92,7 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const {
       status, availabilitySchedule, displayName, bio, skills,
-      hourlyRateUsdc, taskRateUsdc, walletAddress, avatarUrl,
+      taskRateUsdc, walletAddress, avatarUrl,
     } = body;
 
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -172,7 +171,6 @@ export async function PATCH(request: Request) {
       }
       updates.walletAddress = walletAddress;
     }
-    if (hourlyRateUsdc !== undefined) updates.hourlyRateUsdc = hourlyRateUsdc;
     if (taskRateUsdc !== undefined) updates.taskRateUsdc = taskRateUsdc;
     if (skills !== undefined) {
       if (!Array.isArray(skills)) return jsonError("'skills' must be an array", 400);

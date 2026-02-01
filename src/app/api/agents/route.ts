@@ -42,7 +42,6 @@ export async function GET(request: Request) {
         avatarUrl: schema.agents.avatarUrl,
         platform: schema.agents.platform,
         skills: schema.agents.skills,
-        hourlyRateUsdc: schema.agents.hourlyRateUsdc,
         taskRateUsdc: schema.agents.taskRateUsdc,
         status: schema.agents.status,
         reputationScore: schema.agents.reputationScore,

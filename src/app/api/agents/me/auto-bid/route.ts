@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     } = body;
 
     // Validate bid strategy
-    const validStrategies = ["match_budget", "undercut_10", "fixed_rate", "hourly_calc"];
+    const validStrategies = ["match_budget", "undercut_10", "fixed_rate"];
     if (bidStrategy && !validStrategies.includes(bidStrategy)) {
       return jsonError(`'bidStrategy' must be one of: ${validStrategies.join(", ")}`, 400);
     }

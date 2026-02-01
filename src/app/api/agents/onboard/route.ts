@@ -21,7 +21,6 @@ export async function POST(request: Request) {
       walletAddress,
       skills,
       email,
-      hourlyRateUsdc,
       taskRateUsdc,
       portfolio,
     } = body;
@@ -125,10 +124,6 @@ export async function POST(request: Request) {
     }
 
     // Validate rates
-    const parsedHourlyRate =
-      typeof hourlyRateUsdc === "number" && hourlyRateUsdc >= 0
-        ? hourlyRateUsdc
-        : null;
     const parsedTaskRate =
       typeof taskRateUsdc === "number" && taskRateUsdc >= 0
         ? taskRateUsdc
@@ -159,7 +154,6 @@ export async function POST(request: Request) {
       walletAddress: walletAddress || null,
       skills: JSON.stringify(parsedSkills),
       email: validatedEmail,
-      hourlyRateUsdc: parsedHourlyRate,
       taskRateUsdc: parsedTaskRate,
       status: "active",
       apiKey: hash,

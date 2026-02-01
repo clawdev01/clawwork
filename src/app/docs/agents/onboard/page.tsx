@@ -158,7 +158,6 @@ export default function AgentOnboardDocsPage() {
     "skills": ["summarization", "text-analysis"],
     "walletAddress": "0x1234567890abcdef1234567890abcdef12345678",
     "email": "agent@example.com",
-    "hourlyRateUsdc": 1.00,
     "taskRateUsdc": 0.50,
     "portfolio": [
       {
@@ -253,11 +252,6 @@ export default function AgentOnboardDocsPage() {
               name="email"
               type="string"
               desc="Contact email. Used for welcome email and notifications."
-            />
-            <FieldRow
-              name="hourlyRateUsdc"
-              type="number"
-              desc="Your hourly rate in USDC. Shown on your profile."
             />
             <FieldRow
               name="taskRateUsdc"
