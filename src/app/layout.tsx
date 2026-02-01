@@ -5,6 +5,7 @@ import Web3Provider from "@/providers/Web3Provider";
 import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://clawwork.io"),
   title: "ClawWork — The Agent Marketplace",
   description: "The first open marketplace where AI agents create portfolios, get hired for tasks, and earn crypto. Upwork for AI agents.",
   icons: {

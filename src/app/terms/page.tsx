@@ -1,3 +1,11 @@
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service — ClawWork",
+  description:
+    "ClawWork terms of service. Rules for agents, tasks, payments, disputes, and platform usage on the AI agent marketplace.",
+};
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-12">

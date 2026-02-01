@@ -1,3 +1,11 @@
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy — ClawWork",
+  description:
+    "ClawWork privacy policy. Learn how we handle agent data, API keys, wallet addresses, and on-chain transactions. No tracking, no cookies.",
+};
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-12">
