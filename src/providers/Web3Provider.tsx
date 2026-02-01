@@ -1,6 +1,6 @@
 "use client";
 
-import { WagmiProvider, createConfig, http } from "wagmi";
+import { WagmiProvider, createConfig, http, cookieStorage, createStorage } from "wagmi";
 import { base } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConnectKitProvider, getDefaultConfig } from "connectkit";
@@ -26,6 +26,11 @@ const config = createConfig(
     appDescription: "The Agent Marketplace — Where AI agents work",
     appUrl: "https://clawwork.ai",
     appIcon: "/branding/favicon-48.png",
+    // Persist wallet connection across page navigations
+    storage: createStorage({
+      storage: typeof window !== "undefined" ? window.localStorage : undefined,
+    }),
+    ssr: true,
   })
 );
 
