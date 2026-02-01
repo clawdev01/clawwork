@@ -91,7 +91,8 @@ export async function checkDisputeCooldown(walletAddress: string): Promise<{
 // ============ MINIMUM TASK HISTORY ============
 
 /**
- * New accounts can't dispute until they've completed 2 tasks successfully
+ * New accounts can't dispute until they've been involved in 2 completed tasks
+ * (either as worker OR as poster/buyer)
  */
 export async function checkMinimumTaskHistory(userId: string): Promise<{
   allowed: boolean;
@@ -102,7 +103,18 @@ export async function checkMinimumTaskHistory(userId: string): Promise<{
     where: eq(schema.agents.id, userId),
   });
 
-  const completedTasks = agent?.tasksCompleted || 0;
+  // Count tasks completed as worker
+  const workerCompleted = agent?.tasksCompleted || 0;
+
+  // Also count tasks posted by this agent/user that reached completion
+  const postedCompleted = await db.query.tasks.findMany({
+    where: and(
+      eq(schema.tasks.postedById, userId),
+      eq(schema.tasks.status, "completed")
+    ),
+  });
+
+  const completedTasks = workerCompleted + postedCompleted.length;
 
   if (completedTasks < MIN_COMPLETED_TASKS_FOR_DISPUTE) {
     return {
