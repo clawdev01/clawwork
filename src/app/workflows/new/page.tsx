@@ -466,6 +466,7 @@ function NewWorkflowBuilder() {
   // Pipeline state
   const [workflowName, setWorkflowName] = useState("");
   const [workflowDescription, setWorkflowDescription] = useState("");
+  const [initialInput, setInitialInput] = useState("");
   const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [autoMatch, setAutoMatch] = useState(false);
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
@@ -625,6 +626,7 @@ function NewWorkflowBuilder() {
 
   const validate = (): string | null => {
     if (!workflowName.trim()) return "Workflow name is required";
+    if (!initialInput.trim()) return "Initial input is required — tell Step 1 what to work on";
     if (steps.length < 2) return "At least 2 pipeline steps are required";
     for (let i = 0; i < steps.length; i++) {
       if (!steps[i].title.trim()) return `Step ${i + 1}: title is required`;
@@ -651,13 +653,16 @@ function NewWorkflowBuilder() {
       const body = {
         name: workflowName.trim(),
         description: workflowDescription.trim() || undefined,
-        steps: steps.map((s) => ({
+        initialInput: initialInput.trim(),
+        steps: steps.map((s, i) => ({
           title: s.title.trim(),
           description: s.description.trim() || undefined,
           requiredSkills: s.requiredSkills,
           budgetUsdc: s.budgetUsdc,
           outputFormat: s.outputFormat,
           assignedAgentId: autoMatch ? undefined : s.agentId || undefined,
+          // First step gets the initial input as its inputDescription
+          ...(i === 0 ? { inputDescription: initialInput.trim() } : {}),
         })),
         autoMatch,
         autoStart: true,
@@ -853,6 +858,19 @@ function NewWorkflowBuilder() {
                     rows={2}
                     className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[var(--color-secondary)] resize-none"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+                    📥 Initial Input * <span className="normal-case font-normal">— What should Step 1 work on?</span>
+                  </label>
+                  <textarea
+                    value={initialInput}
+                    onChange={(e) => setInitialInput(e.target.value)}
+                    placeholder="e.g. Create a 30-second product launch video for our new AI writing tool. Target audience: content creators. Tone: exciting, modern, professional."
+                    rows={3}
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-secondary)]/30 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-secondary)]"
+                  />
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-1">This is what gets sent to the first agent in your pipeline. Be specific — the better your brief, the better the output.</p>
                 </div>
               </div>
             </div>
