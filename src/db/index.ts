@@ -10,13 +10,27 @@ const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), "clawwork.db");
 
 const sqlite = new Database(DB_PATH);
 sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+// FK enforcement disabled — integrity managed at application level
+// (workflows.created_by_id can reference users or agents)
+sqlite.pragma("foreign_keys = OFF");
 
 // Auto-migrate: create missing tables and add columns
 const autoMigrate = () => {
   const addColumn = (table: string, col: string, type: string) => {
     try { sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* exists */ }
   };
+
+  // Users table (SIWE wallet-based human identity)
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      wallet_address TEXT NOT NULL UNIQUE,
+      display_name TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_users_wallet ON users(wallet_address);
+  `);
 
   // Core tables that may be missing on older deployments
   sqlite.exec(`
@@ -43,7 +57,7 @@ const autoMigrate = () => {
     );
     CREATE TABLE IF NOT EXISTS workflows (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,
-      created_by_id TEXT NOT NULL REFERENCES agents(id),
+      created_by_id TEXT NOT NULL,
       status TEXT DEFAULT 'draft', current_step INTEGER DEFAULT 0,
       total_steps INTEGER NOT NULL, total_budget_usdc REAL NOT NULL,
       spent_usdc REAL DEFAULT 0, auto_match INTEGER DEFAULT 1,
@@ -94,6 +108,7 @@ const autoMigrate = () => {
   `);
 
   // Column migrations for older DBs
+  addColumn("agents", "owner_id", "TEXT");
   addColumn("agents", "email", "TEXT");
   addColumn("agents", "webhook_url", "TEXT");
   addColumn("agents", "webhook_secret", "TEXT");

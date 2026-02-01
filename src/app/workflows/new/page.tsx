@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/providers/Web3Provider";
+import { useAccount } from "wagmi";
+import { ConnectKitButton } from "connectkit";
 
 /* ─── Types ─── */
 interface PortfolioItem {
@@ -448,6 +451,8 @@ export default function NewWorkflowPage() {
 function NewWorkflowBuilder() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isSignedIn, signIn, isLoading: authLoading } = useAuth();
+  const { isConnected } = useAccount();
 
   // Agent browser state
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -631,15 +636,16 @@ function NewWorkflowBuilder() {
   const handleLaunch = async () => {
     const err = validate();
     if (err) { setLaunchError(err); return; }
-    setLaunching(true);
-    setLaunchError("");
 
+    // Check auth: try SIWE session first, fall back to API key
     const apiKey = localStorage.getItem("clawwork_api_key");
-    if (!apiKey) {
-      setLaunchError("API key required. Set it on the Dashboard first.");
-      setLaunching(false);
+    if (!isSignedIn && !apiKey) {
+      setLaunchError("Connect your wallet and sign in, or set an API key on the Dashboard.");
       return;
     }
+
+    setLaunching(true);
+    setLaunchError("");
 
     try {
       const body = {
@@ -658,12 +664,18 @@ function NewWorkflowBuilder() {
         isTemplate: saveAsTemplate,
       };
 
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      // Use API key if available and not signed in via wallet
+      if (!isSignedIn && apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
+
       const res = await fetch("/api/workflows", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(body),
       });
       const json = await res.json();
@@ -932,13 +944,35 @@ function NewWorkflowBuilder() {
                   </label>
                 </div>
 
-                <button
-                  onClick={handleLaunch}
-                  disabled={launching || steps.length < 2}
-                  className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] disabled:opacity-50 text-white font-bold px-8 py-3 rounded-xl transition-colors text-sm whitespace-nowrap"
-                >
-                  {launching ? "Launching..." : "Launch Workflow →"}
-                </button>
+                {!isSignedIn && !localStorage.getItem("clawwork_api_key") ? (
+                  isConnected ? (
+                    <button
+                      onClick={signIn}
+                      className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-bold px-8 py-3 rounded-xl transition-colors text-sm whitespace-nowrap"
+                    >
+                      Sign In to Launch →
+                    </button>
+                  ) : (
+                    <ConnectKitButton.Custom>
+                      {({ show }) => (
+                        <button
+                          onClick={show}
+                          className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-bold px-8 py-3 rounded-xl transition-colors text-sm whitespace-nowrap"
+                        >
+                          Connect Wallet to Launch →
+                        </button>
+                      )}
+                    </ConnectKitButton.Custom>
+                  )
+                ) : (
+                  <button
+                    onClick={handleLaunch}
+                    disabled={launching || steps.length < 2}
+                    className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] disabled:opacity-50 text-white font-bold px-8 py-3 rounded-xl transition-colors text-sm whitespace-nowrap"
+                  >
+                    {launching ? "Launching..." : "Launch Workflow →"}
+                  </button>
+                )}
               </div>
             </div>
           </div>

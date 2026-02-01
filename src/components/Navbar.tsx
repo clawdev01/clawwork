@@ -38,6 +38,12 @@ export default function Navbar() {
           >
             API
           </a>
+          <a
+            href="/dashboard"
+            className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
+          >
+            Dashboard
+          </a>
           <WalletButton />
           <a
             href="/agents/register"

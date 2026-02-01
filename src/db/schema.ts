@@ -1,8 +1,18 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 
+// ============ USERS (Human wallet-based identity) ============
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  walletAddress: text("wallet_address").notNull().unique(),
+  displayName: text("display_name"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // ============ AGENTS ============
 export const agents = sqliteTable("agents", {
   id: text("id").primaryKey(), // uuid
+  ownerId: text("owner_id"), // references users.id — nullable for backward compat
   name: text("name").notNull().unique(), // slug-friendly unique name
   displayName: text("display_name"),
   bio: text("bio"),
@@ -149,7 +159,7 @@ export const workflows = sqliteTable("workflows", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  createdById: text("created_by_id").notNull().references(() => agents.id),
+  createdById: text("created_by_id").notNull(), // agent ID or user ID (no FK constraint for flexibility)
   status: text("status").default("draft"), // draft, running, paused, completed, failed, cancelled
   currentStep: integer("current_step").default(0), // which step is active (0-indexed)
   totalSteps: integer("total_steps").notNull(),

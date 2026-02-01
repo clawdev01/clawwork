@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useAuth } from "@/providers/Web3Provider";
+import { useAccount } from "wagmi";
+import { ConnectKitButton } from "connectkit";
 
 interface Workflow {
   id: string;
@@ -129,6 +132,9 @@ function TemplateCard({ template }: { template: Template }) {
 
 /* ─── Main Page ─── */
 export default function WorkflowsPage() {
+  const { isSignedIn, signIn, isLoading: authLoading } = useAuth();
+  const { isConnected } = useAccount();
+
   const [apiKey, setApiKey] = useState("");
   const [savedKey, setSavedKey] = useState("");
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -142,26 +148,33 @@ export default function WorkflowsPage() {
     if (stored) {
       setSavedKey(stored);
       setApiKey(stored);
-      setTab("mine"); // Auto-switch to My Workflows if logged in
+      setTab("mine");
+    } else if (isSignedIn) {
+      setTab("mine");
     }
     fetchTemplates();
-  }, []);
+  }, [isSignedIn]);
 
-  const fetchWorkflows = useCallback(async (key: string) => {
+  const fetchWorkflows = useCallback(async (key?: string) => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/workflows", {
-        headers: { Authorization: `Bearer ${key}` },
-      });
+      const headers: Record<string, string> = {};
+      if (key) {
+        headers["Authorization"] = `Bearer ${key}`;
+      }
+      // If no key, session cookie is sent automatically
+      const res = await fetch("/api/workflows", { headers });
       const json = await res.json();
       if (!json.success) {
         setError(json.error || "Failed to load workflows");
         setWorkflows([]);
       } else {
         setWorkflows(json.workflows || []);
-        localStorage.setItem("clawwork_api_key", key);
-        setSavedKey(key);
+        if (key) {
+          localStorage.setItem("clawwork_api_key", key);
+          setSavedKey(key);
+        }
       }
     } catch {
       setError("Network error");
@@ -178,15 +191,17 @@ export default function WorkflowsPage() {
     } catch { /* ignore */ }
   };
 
+  // Fetch workflows when signed in via wallet or API key
   useEffect(() => {
     if (savedKey) fetchWorkflows(savedKey);
-  }, [savedKey, fetchWorkflows]);
+    else if (isSignedIn) fetchWorkflows();
+  }, [savedKey, isSignedIn, fetchWorkflows]);
 
   // Split workflows into regular and templates
   const regularWorkflows = workflows.filter((w) => !w.isTemplate);
   const myTemplates = workflows.filter((w) => !!w.isTemplate);
 
-  const needsApiKey = (tab === "mine" || tab === "my-templates") && !savedKey && !loading;
+  const needsAuth = (tab === "mine" || tab === "my-templates") && !savedKey && !isSignedIn && !loading;
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
@@ -220,36 +235,67 @@ export default function WorkflowsPage() {
           ))}
         </div>
 
-        {/* API Key prompt */}
-        {needsApiKey && (
+        {/* Auth prompt */}
+        {needsAuth && (
           <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 max-w-md mx-auto">
-            <h2 className="text-xl font-bold mb-2">Enter API Key</h2>
-            <p className="text-[var(--color-text-muted)] text-sm mb-6">Enter your API key to view your workflows.</p>
+            <h2 className="text-xl font-bold mb-2">Sign In</h2>
+            <p className="text-[var(--color-text-muted)] text-sm mb-6">Connect your wallet or enter an API key to view your workflows.</p>
             {error && (
               <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 rounded-lg p-3 mb-4 text-sm text-[var(--color-primary)]">
                 {error}
               </div>
             )}
+
+            {/* Wallet auth */}
+            <div className="mb-6">
+              {isConnected ? (
+                <button
+                  onClick={signIn}
+                  className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold py-3 rounded-xl transition-colors"
+                >
+                  Sign In with Wallet
+                </button>
+              ) : (
+                <ConnectKitButton.Custom>
+                  {({ show }) => (
+                    <button
+                      onClick={show}
+                      className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold py-3 rounded-xl transition-colors"
+                    >
+                      Connect Wallet
+                    </button>
+                  )}
+                </ConnectKitButton.Custom>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex-1 h-px bg-[var(--color-border)]" />
+              <span className="text-xs text-[var(--color-text-muted)]">OR</span>
+              <div className="flex-1 h-px bg-[var(--color-border)]" />
+            </div>
+
+            {/* API key auth */}
             <input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="cw_..."
+              placeholder="Agent API Key (cw_...)"
               className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-[var(--color-secondary)]"
               onKeyDown={(e) => e.key === "Enter" && apiKey && fetchWorkflows(apiKey)}
             />
             <button
               onClick={() => fetchWorkflows(apiKey)}
               disabled={!apiKey}
-              className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors"
+              className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] hover:border-[var(--color-text-muted)] disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors"
             >
-              Load Workflows
+              Load with API Key
             </button>
           </div>
         )}
 
         {/* My Workflows Tab */}
-        {tab === "mine" && !needsApiKey && (
+        {tab === "mine" && !needsAuth && (
           <>
             {loading ? (
               <div className="text-center py-12 text-[var(--color-text-muted)]">Loading workflows...</div>
@@ -310,7 +356,7 @@ export default function WorkflowsPage() {
         )}
 
         {/* My Templates Tab */}
-        {tab === "my-templates" && !needsApiKey && (
+        {tab === "my-templates" && !needsAuth && (
           <>
             {loading ? (
               <div className="text-center py-12 text-[var(--color-text-muted)]">Loading templates...</div>

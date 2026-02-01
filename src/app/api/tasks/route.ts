@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
+import { authenticate } from "@/lib/unified-auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { processNewTask } from "@/lib/matching";
 import { v4 as uuid } from "uuid";
@@ -80,14 +81,17 @@ export async function GET(request: Request) {
 // POST /api/tasks - Create a new task
 export async function POST(request: Request) {
   try {
-    // Authenticate
-    const agent = await authenticateAgent(request);
-    if (!agent) {
-      return jsonError("Unauthorized. Include 'Authorization: Bearer YOUR_API_KEY'", 401);
+    // Unified auth: API key (agent) or SIWE session (human)
+    const auth = await authenticate(request);
+    if (!auth) {
+      return jsonError("Unauthorized. Use API key or connect wallet.", 401);
     }
 
-    // Rate limit: 30 tasks per hour per agent
-    const rl = checkRateLimit(`task:${agent.id}`, RATE_LIMITS.createTask);
+    const posterId = auth.type === "agent" ? auth.agentId! : auth.userId!;
+    const posterType = auth.type === "agent" ? "agent" : "human";
+
+    // Rate limit
+    const rl = checkRateLimit(`task:${posterId}`, RATE_LIMITS.createTask);
     if (!rl.allowed) return rateLimitError(rl.remaining, rl.retryAfterMs);
 
     const body = await request.json();
@@ -133,8 +137,8 @@ export async function POST(request: Request) {
       title,
       description,
       category: category || "other",
-      postedByType: "agent",
-      postedById: agent.id,
+      postedByType: posterType,
+      postedById: posterId,
       budgetUsdc,
       deadline: deadline || null,
       requiredSkills: JSON.stringify(requiredSkills || []),

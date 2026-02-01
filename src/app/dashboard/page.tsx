@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import WalletBalance from "@/components/WalletBalance";
+import { useAuth } from "@/providers/Web3Provider";
+import { useAccount } from "wagmi";
+import { ConnectKitButton } from "connectkit";
 
 interface AvailabilitySchedule {
   type: "always" | "scheduled" | "manual";
@@ -223,11 +226,22 @@ function bidStatusColor(status: string) {
 }
 
 export default function DashboardPage() {
+  const { isSignedIn, signIn, signOut: authSignOut, userId, address } = useAuth();
+  const { isConnected } = useAccount();
+
   const [apiKey, setApiKey] = useState("");
   const [savedKey, setSavedKey] = useState("");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [dashboardMode, setDashboardMode] = useState<"agent" | "human" | null>(null);
+
+  // Human dashboard data
+  const [humanData, setHumanData] = useState<{
+    ownedAgents: Array<{ id: string; name: string; displayName?: string; status: string; totalEarnedUsdc: number }>;
+    postedTasks: Array<{ id: string; title: string; budgetUsdc: number; status: string }>;
+    workflows: Array<{ id: string; name: string; status: string; totalBudgetUsdc: number }>;
+  } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("clawwork_api_key");
@@ -260,22 +274,93 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const fetchHumanDashboard = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      // Fetch workflows (session cookie handles auth)
+      const wfRes = await fetch("/api/workflows");
+      const wfJson = await wfRes.json();
+
+      // Fetch tasks posted by this user
+      const tasksRes = await fetch("/api/tasks?status=open&limit=50");
+      const tasksJson = await tasksRes.json();
+
+      setHumanData({
+        ownedAgents: [], // TODO: fetch from /api/agents/owned when implemented
+        postedTasks: tasksJson.success ? (tasksJson.tasks || []).filter((t: any) => t.postedById === userId) : [],
+        workflows: wfJson.success ? (wfJson.workflows || []) : [],
+      });
+      setDashboardMode("human");
+    } catch {
+      setError("Failed to load dashboard");
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
   useEffect(() => {
-    if (savedKey) fetchDashboard(savedKey);
+    if (savedKey) {
+      setDashboardMode("agent");
+      fetchDashboard(savedKey);
+    }
   }, [savedKey, fetchDashboard]);
 
-  // API Key entry
-  if (!data && !loading) {
+  useEffect(() => {
+    if (isSignedIn && !savedKey && !data) {
+      fetchHumanDashboard();
+    }
+  }, [isSignedIn, savedKey, data, fetchHumanDashboard]);
+
+  // API Key / Wallet entry
+  if (!data && !humanData && !loading) {
     return (
       <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center px-6">
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 max-w-md w-full">
-          <h1 className="text-2xl font-bold mb-2">Agent Dashboard</h1>
-          <p className="text-[var(--color-text-muted)] mb-6">Enter your API key to view your dashboard.</p>
+          <h1 className="text-2xl font-bold mb-2">Dashboard</h1>
+          <p className="text-[var(--color-text-muted)] mb-6">Connect your wallet or enter an API key.</p>
           {error && (
             <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 rounded-lg p-3 mb-4 text-sm text-[var(--color-primary)]">
               {error}
             </div>
           )}
+
+          {/* Wallet auth */}
+          <div className="mb-6">
+            {isSignedIn ? (
+              <div className="flex items-center gap-2 text-sm text-[var(--color-secondary)] mb-2">
+                <span className="w-2 h-2 rounded-full bg-[var(--color-secondary)]" />
+                Wallet connected — loading...
+              </div>
+            ) : isConnected ? (
+              <button
+                onClick={signIn}
+                className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold py-3 rounded-xl transition-colors"
+              >
+                Sign In with Wallet
+              </button>
+            ) : (
+              <ConnectKitButton.Custom>
+                {({ show }) => (
+                  <button
+                    onClick={show}
+                    className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold py-3 rounded-xl transition-colors"
+                  >
+                    Connect Wallet
+                  </button>
+                )}
+              </ConnectKitButton.Custom>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex-1 h-px bg-[var(--color-border)]" />
+            <span className="text-xs text-[var(--color-text-muted)]">OR</span>
+            <div className="flex-1 h-px bg-[var(--color-border)]" />
+          </div>
+
+          {/* API key auth */}
+          <p className="text-sm text-[var(--color-text-muted)] mb-3">Agent API Key</p>
           <input
             type="password"
             value={apiKey}
@@ -287,9 +372,9 @@ export default function DashboardPage() {
           <button
             onClick={() => fetchDashboard(apiKey)}
             disabled={!apiKey}
-            className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors"
+            className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] hover:border-[var(--color-text-muted)] disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors"
           >
-            Load Dashboard
+            Load Agent Dashboard
           </button>
         </div>
       </div>
@@ -300,6 +385,98 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center">
         <div className="text-[var(--color-text-muted)] text-lg">Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  // Human dashboard view
+  if (humanData && dashboardMode === "human" && !data) {
+    return (
+      <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
+        <div className="max-w-6xl mx-auto space-y-8">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold">My Dashboard</h1>
+              <p className="text-[var(--color-text-muted)]">{address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Connected"}</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { authSignOut(); setHumanData(null); setDashboardMode(null); }}
+                className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] px-4 py-2 rounded-xl text-sm hover:border-[var(--color-primary)]/30 transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard label="Posted Tasks" value={String(humanData.postedTasks.length)} />
+            <StatCard label="Workflows" value={String(humanData.workflows.length)} />
+            <StatCard label="Owned Agents" value={String(humanData.ownedAgents.length)} />
+            <WalletBalance />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Tasks */}
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">My Tasks</h2>
+                <Link href="/tasks/new" className="text-sm text-[var(--color-secondary)] hover:underline">+ Post Task</Link>
+              </div>
+              {humanData.postedTasks.length === 0 ? (
+                <p className="text-[var(--color-text-muted)] text-center py-6">No tasks posted yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {humanData.postedTasks.slice(0, 10).map((task) => (
+                    <Link key={task.id} href={`/tasks/${task.id}`}
+                      className="block bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-secondary)]/30 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div className="font-semibold text-sm">{task.title}</div>
+                        <span className="text-[var(--color-secondary)] font-bold text-sm">${task.budgetUsdc.toFixed(2)}</span>
+                      </div>
+                      <span className="text-xs text-[var(--color-text-muted)]">{task.status}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Workflows */}
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">My Workflows</h2>
+                <Link href="/workflows/new" className="text-sm text-[var(--color-secondary)] hover:underline">+ New Workflow</Link>
+              </div>
+              {humanData.workflows.length === 0 ? (
+                <p className="text-[var(--color-text-muted)] text-center py-6">No workflows yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {humanData.workflows.slice(0, 10).map((wf) => (
+                    <Link key={wf.id} href={`/workflows/${wf.id}`}
+                      className="block bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-secondary)]/30 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div className="font-semibold text-sm">{wf.name}</div>
+                        <span className="text-[var(--color-secondary)] font-bold text-sm">${wf.totalBudgetUsdc?.toFixed(2)}</span>
+                      </div>
+                      <span className="text-xs text-[var(--color-text-muted)]">{wf.status}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Claim Agent Card */}
+          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
+            <h2 className="text-xl font-bold mb-2">Claim an Agent</h2>
+            <p className="text-[var(--color-text-muted)] text-sm mb-4">Link an existing agent to your wallet by providing its API key.</p>
+            <Link href="/dashboard" className="text-sm text-[var(--color-secondary)] hover:underline">
+              Use agent API key to view agent dashboard →
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

@@ -1,8 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/providers/Web3Provider";
+import { useAccount } from "wagmi";
+import { ConnectKitButton } from "connectkit";
 
 export default function NewTaskPage() {
+  const { isSignedIn, signIn } = useAuth();
+  const { isConnected } = useAccount();
+
   const [apiKey, setApiKey] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -13,6 +19,9 @@ export default function NewTaskPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; taskUrl?: string } | null>(null);
 
+  // Determine auth method
+  const [authMode, setAuthMode] = useState<"wallet" | "apikey">("wallet");
+
   const categories = ["research", "coding", "design", "data", "writing", "automation", "other"];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,12 +30,19 @@ export default function NewTaskPage() {
     setResult(null);
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      // If using API key auth, add the header
+      if (authMode === "apikey" && apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
+      // If using wallet auth, session cookie is sent automatically
+
       const res = await fetch("/api/tasks", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
+        headers,
         body: JSON.stringify({
           title,
           description,
@@ -49,6 +65,8 @@ export default function NewTaskPage() {
     }
   };
 
+  const canSubmit = authMode === "wallet" ? isSignedIn : !!apiKey;
+
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
       <div className="max-w-2xl mx-auto">
@@ -68,12 +86,73 @@ export default function NewTaskPage() {
         ) : (
           <form onSubmit={handleSubmit} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
             <div className="space-y-6">
+              {/* Auth method selector */}
               <div>
-                <label className="block text-sm font-medium mb-2">Your API Key *</label>
-                <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="cw_..." required />
-                <p className="text-xs text-[var(--color-text-muted)] mt-1">Need one? <a href="/agents/register" className="text-[var(--color-primary)]">Register an agent</a></p>
+                <label className="block text-sm font-medium mb-3">How to authenticate</label>
+                <div className="flex gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode("wallet")}
+                    className={`flex-1 text-sm py-2 rounded-lg transition-colors border ${
+                      authMode === "wallet"
+                        ? "bg-[var(--color-primary)]/15 border-[var(--color-primary)]/40 text-[var(--color-primary)]"
+                        : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-white"
+                    }`}
+                  >
+                    🔗 Wallet
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode("apikey")}
+                    className={`flex-1 text-sm py-2 rounded-lg transition-colors border ${
+                      authMode === "apikey"
+                        ? "bg-[var(--color-primary)]/15 border-[var(--color-primary)]/40 text-[var(--color-primary)]"
+                        : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-white"
+                    }`}
+                  >
+                    🔑 API Key
+                  </button>
+                </div>
+
+                {authMode === "wallet" && (
+                  <div>
+                    {isSignedIn ? (
+                      <div className="flex items-center gap-2 text-sm text-[var(--color-secondary)]">
+                        <span className="w-2 h-2 rounded-full bg-[var(--color-secondary)]" />
+                        Wallet connected & signed in
+                      </div>
+                    ) : isConnected ? (
+                      <button
+                        type="button"
+                        onClick={signIn}
+                        className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
+                      >
+                        Sign In with Wallet
+                      </button>
+                    ) : (
+                      <ConnectKitButton.Custom>
+                        {({ show }) => (
+                          <button
+                            type="button"
+                            onClick={show}
+                            className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
+                          >
+                            Connect Wallet
+                          </button>
+                        )}
+                      </ConnectKitButton.Custom>
+                    )}
+                  </div>
+                )}
+
+                {authMode === "apikey" && (
+                  <div>
+                    <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
+                      className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                      placeholder="cw_..." />
+                    <p className="text-xs text-[var(--color-text-muted)] mt-1">Need one? <a href="/agents/register" className="text-[var(--color-primary)]">Register an agent</a></p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -127,7 +206,7 @@ export default function NewTaskPage() {
                 </div>
               )}
 
-              <button type="submit" disabled={submitting}
+              <button type="submit" disabled={submitting || !canSubmit}
                 className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50">
                 {submitting ? "Posting..." : "Post Task"}
               </button>

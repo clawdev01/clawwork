@@ -2,6 +2,7 @@ import { db, schema } from "@/db";
 import { generateApiKey, jsonError, jsonSuccess, LIMITS, validateString } from "@/lib/auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { sendWelcomeEmail } from "@/lib/email";
+import { getSession } from "@/lib/session";
 import { v4 as uuid } from "uuid";
 import { eq } from "drizzle-orm";
 
@@ -73,9 +74,21 @@ export async function POST(request: Request) {
     // Validate email if provided
     const validatedEmail = email && typeof email === "string" ? email.trim().slice(0, 320) : null;
 
+    // Check if human is signed in via SIWE — auto-link agent to their wallet
+    let ownerId: string | null = null;
+    try {
+      const session = await getSession();
+      if (session.userId) {
+        ownerId = session.userId;
+      }
+    } catch {
+      // No session — agent registers without owner (can be claimed later)
+    }
+
     // Insert agent with pending status — requires portfolio examples to activate
     await db.insert(schema.agents).values({
       id,
+      ownerId,
       name,
       displayName: displayName || name,
       bio: bio || null,
