@@ -3,27 +3,66 @@ import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { processNewTask } from "@/lib/matching";
 import { v4 as uuid } from "uuid";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc, and, like, gte, lte, sql } from "drizzle-orm";
 
-// GET /api/tasks - List open tasks
+// GET /api/tasks - List open tasks with search/filter/sort
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const status = url.searchParams.get("status") || "open";
     const category = url.searchParams.get("category");
+    const search = url.searchParams.get("search");
+    const minBudget = url.searchParams.get("minBudget");
+    const maxBudget = url.searchParams.get("maxBudget");
+    const skillsParam = url.searchParams.get("skills");
+    const sortBy = url.searchParams.get("sortBy") || "newest";
     const limit = Math.min(parseInt(url.searchParams.get("limit") || "20"), 100);
     const offset = parseInt(url.searchParams.get("offset") || "0");
+
+    // Build conditions
+    const conditions = [eq(schema.tasks.status, status)];
+
+    if (search) {
+      conditions.push(
+        sql`(${schema.tasks.title} LIKE ${'%' + search + '%'} OR ${schema.tasks.description} LIKE ${'%' + search + '%'})`
+      );
+    }
+
+    if (minBudget) {
+      conditions.push(gte(schema.tasks.budgetUsdc, parseFloat(minBudget)));
+    }
+    if (maxBudget) {
+      conditions.push(lte(schema.tasks.budgetUsdc, parseFloat(maxBudget)));
+    }
+
+    // Sort
+    const orderBy =
+      sortBy === "budget_high" ? desc(schema.tasks.budgetUsdc) :
+      sortBy === "budget_low" ? asc(schema.tasks.budgetUsdc) :
+      sortBy === "deadline" ? asc(schema.tasks.deadline) :
+      desc(schema.tasks.createdAt);
 
     let results = await db
       .select()
       .from(schema.tasks)
-      .where(eq(schema.tasks.status, status))
-      .orderBy(desc(schema.tasks.createdAt))
+      .where(and(...conditions))
+      .orderBy(orderBy)
       .limit(limit)
       .offset(offset);
 
+    // Post-query filters (JSON fields)
     if (category) {
       results = results.filter((t) => t.category === category);
+    }
+
+    if (skillsParam) {
+      const searchSkills = skillsParam.split(",").map((s) => s.trim().toLowerCase());
+      results = results.filter((t) => {
+        const taskSkills = JSON.parse(t.requiredSkills || "[]") as string[];
+        return searchSkills.some((ss) =>
+          taskSkills.some((ts) => ts.toLowerCase().includes(ss))
+        );
+      });
     }
 
     const tasks = results.map((task) => ({
@@ -108,15 +147,13 @@ export async function POST(request: Request) {
     });
 
     // 🔥 MATCHING ENGINE: find agents, auto-bid, auto-accept
-    // Runs async so task creation returns fast
     const matchingPromise = processNewTask(id).catch((err) =>
       console.error("Matching engine error:", err)
     );
 
-    // Wait briefly for instant matches (auto-accept can happen in <100ms)
     const matchResult = await Promise.race([
       matchingPromise,
-      new Promise((resolve) => setTimeout(() => resolve(null), 2000)), // 2s timeout
+      new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
     ]);
 
     const response: Record<string, unknown> = {

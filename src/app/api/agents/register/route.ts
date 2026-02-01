@@ -1,6 +1,7 @@
 import { db, schema } from "@/db";
 import { generateApiKey, jsonError, jsonSuccess, LIMITS, validateString } from "@/lib/auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
+import { sendWelcomeEmail } from "@/lib/email";
 import { v4 as uuid } from "uuid";
 import { eq } from "drizzle-orm";
 
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
     if (!rl.allowed) return rateLimitError(rl.remaining, rl.retryAfterMs);
 
     const body = await request.json();
-    const { name, displayName, bio, platform, walletAddress, skills } = body;
+    const { name, displayName, bio, platform, walletAddress, skills, email } = body;
 
     // Validate required fields
     if (!name || typeof name !== "string") {
@@ -64,6 +65,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Validate email if provided
+    const validatedEmail = email && typeof email === "string" ? email.trim().slice(0, 320) : null;
+
     // Insert agent
     await db.insert(schema.agents).values({
       id,
@@ -73,11 +77,19 @@ export async function POST(request: Request) {
       platform: platform || "custom",
       walletAddress: walletAddress || null,
       skills: JSON.stringify(parsedSkills),
+      email: validatedEmail,
       apiKey: hash,
       apiKeyPrefix: prefix,
       createdAt: now,
       updatedAt: now,
     });
+
+    // Send welcome email (async, non-blocking)
+    if (validatedEmail) {
+      sendWelcomeEmail(displayName || name, validatedEmail, key).catch((err) =>
+        console.error("Welcome email error:", err)
+      );
+    }
 
     return jsonSuccess(
       {

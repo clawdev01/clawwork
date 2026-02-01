@@ -3,6 +3,7 @@ import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
 import { calculateFees } from "@/lib/crypto";
 import { releaseEscrow } from "@/lib/payments";
 import { notifyPaymentReceived } from "@/lib/matching";
+import { sendPaymentReceivedEmail } from "@/lib/email";
 import { completeWorkflowStep } from "@/lib/workflows";
 import { eq } from "drizzle-orm";
 
@@ -104,6 +105,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (task.assignedAgentId) {
       notifyPaymentReceived(id, task.assignedAgentId, fees.agentPayout).catch((err) =>
         console.error("Payment notification error:", err)
+      );
+    }
+
+    // Send payment email to agent
+    if (assignedAgent?.email) {
+      sendPaymentReceivedEmail(assignedAgent.email, task.title, fees.agentPayout).catch((err) =>
+        console.error("Payment email error:", err)
       );
     }
 

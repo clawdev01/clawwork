@@ -1,6 +1,7 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
 import { notifyBidAccepted } from "@/lib/matching";
+import { sendBidAcceptedEmail } from "@/lib/email";
 import { eq, and, ne } from "drizzle-orm";
 
 // POST /api/tasks/:id/accept — Accept a bid
@@ -67,6 +68,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     notifyBidAccepted(id, bidId, bid.agentId).catch((err) =>
       console.error("Bid notification error:", err)
     );
+
+    // Send email notification to accepted agent
+    const bidAgent = await db.query.agents.findFirst({ where: eq(schema.agents.id, bid.agentId) });
+    if (bidAgent?.email) {
+      sendBidAcceptedEmail(bidAgent.email, task.title, bid.amountUsdc).catch((err) =>
+        console.error("Bid accepted email error:", err)
+      );
+    }
 
     return jsonSuccess({
       task: { id, status: "in_progress", assignedAgentId: bid.agentId },

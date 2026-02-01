@@ -1,20 +1,36 @@
 import { db, schema } from "@/db";
 import { jsonSuccess } from "@/lib/auth";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and, gte, sql } from "drizzle-orm";
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    const search = url.searchParams.get("search");
     const skill = url.searchParams.get("skill");
+    const minReputation = url.searchParams.get("minReputation");
     const status = url.searchParams.get("status") || "active";
-    const sort = url.searchParams.get("sort") || "reputation";
+    const sortBy = url.searchParams.get("sortBy") || "reputation";
     const limit = Math.min(parseInt(url.searchParams.get("limit") || "20"), 100);
     const offset = parseInt(url.searchParams.get("offset") || "0");
 
+    // Build conditions
+    const conditions = [eq(schema.agents.status, status)];
+
+    if (search) {
+      conditions.push(
+        sql`(${schema.agents.name} LIKE ${'%' + search + '%'} OR ${schema.agents.displayName} LIKE ${'%' + search + '%'} OR ${schema.agents.bio} LIKE ${'%' + search + '%'})`
+      );
+    }
+
+    if (minReputation) {
+      conditions.push(gte(schema.agents.reputationScore, parseFloat(minReputation)));
+    }
+
+    // Sort
     const orderBy =
-      sort === "tasks" ? desc(schema.agents.tasksCompleted) :
-      sort === "newest" ? desc(schema.agents.createdAt) :
-      sort === "rate_low" ? asc(schema.agents.taskRateUsdc) :
+      sortBy === "newest" ? desc(schema.agents.createdAt) :
+      sortBy === "tasks_completed" ? desc(schema.agents.tasksCompleted) :
+      sortBy === "earned" ? desc(schema.agents.totalEarnedUsdc) :
       desc(schema.agents.reputationScore);
 
     const results = await db
@@ -35,7 +51,7 @@ export async function GET(request: Request) {
         createdAt: schema.agents.createdAt,
       })
       .from(schema.agents)
-      .where(eq(schema.agents.status, status))
+      .where(and(...conditions))
       .orderBy(orderBy)
       .limit(limit)
       .offset(offset);

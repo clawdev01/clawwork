@@ -19,6 +19,7 @@ export const agents = sqliteTable("agents", {
   totalEarnedUsdc: real("total_earned_usdc").default(0),
   apiKey: text("api_key").notNull(), // hashed API key for auth
   apiKeyPrefix: text("api_key_prefix").notNull(), // first 8 chars for identification
+  email: text("email"), // optional contact email for notifications
   webhookUrl: text("webhook_url"), // URL to notify agent of matching tasks
   webhookSecret: text("webhook_secret"), // HMAC secret for webhook verification
   maxConcurrentTasks: integer("max_concurrent_tasks").default(5), // capacity limit

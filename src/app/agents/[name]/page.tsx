@@ -1,9 +1,31 @@
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 interface PageProps {
   params: Promise<{ name: string }>;
+}
+
+// Proof type icons
+function proofIcon(proofType: string | null): string {
+  switch (proofType) {
+    case "github_pr": return "💻";
+    case "document": return "📄";
+    case "image": return "🖼️";
+    case "api_response": return "🔌";
+    default: return "📎";
+  }
+}
+
+function proofLabel(proofType: string | null): string {
+  switch (proofType) {
+    case "github_pr": return "GitHub";
+    case "document": return "Document";
+    case "image": return "Image";
+    case "api_response": return "API";
+    default: return "Other";
+  }
 }
 
 export default async function AgentProfilePage({ params }: PageProps) {
@@ -19,19 +41,50 @@ export default async function AgentProfilePage({ params }: PageProps) {
   }
 
   // Fetch portfolio items
-  const portfolios = await db.query.portfolios.findMany({
+  const portfolioItems = await db.query.portfolios.findMany({
     where: eq(schema.portfolios.agentId, agent.id),
     orderBy: (portfolios, { desc }) => [desc(portfolios.createdAt)],
   });
 
-  // Fetch reviews
-  const reviews = await db.query.reviews.findMany({
+  // Fetch reviews with reviewer lookup
+  const reviewRows = await db.query.reviews.findMany({
     where: eq(schema.reviews.agentId, agent.id),
     orderBy: (reviews, { desc }) => [desc(reviews.createdAt)],
     limit: 10,
   });
 
+  // Lookup reviewer names
+  const reviewerIds = [...new Set(reviewRows.map((r) => r.reviewerId))];
+  const reviewerAgents = reviewerIds.length > 0
+    ? await Promise.all(
+        reviewerIds.map((id) =>
+          db.query.agents.findFirst({ where: eq(schema.agents.id, id) })
+        )
+      )
+    : [];
+  const reviewerMap = new Map(
+    reviewerAgents.filter(Boolean).map((a) => [a!.id, a!.displayName || a!.name])
+  );
+
+  const reviews = reviewRows.map((r) => ({
+    ...r,
+    reviewerName: reviewerMap.get(r.reviewerId) || (r.reviewerType === "human" ? "Human Poster" : "Unknown"),
+  }));
+
+  // Active tasks count
+  const activeTaskRows = await db
+    .select({ cnt: count() })
+    .from(schema.tasks)
+    .where(
+      and(
+        eq(schema.tasks.assignedAgentId, agent.id),
+        eq(schema.tasks.status, "in_progress")
+      )
+    );
+  const activeTaskCount = activeTaskRows[0]?.cnt ?? 0;
+
   const skills = JSON.parse(agent.skills || "[]") as string[];
+  const specializations = skills.slice(0, 3);
   const averageRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
 
   return (
@@ -51,9 +104,24 @@ export default async function AgentProfilePage({ params }: PageProps) {
                     {agent.displayName || agent.name}
                   </h1>
                   <p className="text-[var(--color-text-muted)] mb-4">@{agent.name}</p>
+
+                  {/* Specialization Badges */}
+                  {specializations.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {specializations.map((spec) => (
+                        <span
+                          key={spec}
+                          className="bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide"
+                        >
+                          ⭐ {spec}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   <p className="text-lg leading-relaxed mb-6">{agent.bio}</p>
                   
-                  {/* Skills */}
+                  {/* All Skills */}
                   <div className="flex flex-wrap gap-2 mb-6">
                     {skills.map((skill) => (
                       <span
@@ -87,28 +155,63 @@ export default async function AgentProfilePage({ params }: PageProps) {
                   </div>
 
                   {/* CTA Button */}
-                  <button className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold px-8 py-3 rounded-xl transition-colors">
+                  <Link
+                    href={`/tasks/new?agent=${encodeURIComponent(agent.name)}`}
+                    className="inline-block bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold px-8 py-3 rounded-xl transition-colors"
+                  >
                     Hire This Agent
-                  </button>
+                  </Link>
                 </div>
+              </div>
+            </div>
+
+            {/* Hire This Agent Section */}
+            <div className="bg-[var(--color-surface)] border border-[var(--color-secondary)]/20 rounded-2xl p-8">
+              <h2 className="text-xl font-bold mb-3">🚀 Hire {agent.displayName || agent.name}</h2>
+              <p className="text-[var(--color-text-muted)] mb-4">
+                Post a task and have this agent work on it. Create a task with the agent pre-selected.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={`/tasks/new?agent=${encodeURIComponent(agent.name)}`}
+                  className="inline-block bg-[var(--color-secondary)] hover:opacity-90 text-black font-semibold px-6 py-2.5 rounded-xl transition-opacity"
+                >
+                  Create Task for This Agent →
+                </Link>
+                <Link
+                  href="/tasks"
+                  className="inline-block bg-[var(--color-surface-hover)] border border-[var(--color-border)] hover:border-[var(--color-secondary)]/30 font-semibold px-6 py-2.5 rounded-xl transition-colors"
+                >
+                  Browse All Tasks
+                </Link>
               </div>
             </div>
 
             {/* Portfolio */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-6">Portfolio</h2>
-              {portfolios.length === 0 ? (
+              {portfolioItems.length === 0 ? (
                 <p className="text-[var(--color-text-muted)] text-center py-8">
                   No portfolio items yet
                 </p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {portfolios.map((item) => (
+                  {portfolioItems.map((item) => (
                     <div
                       key={item.id}
                       className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-xl p-6 hover:border-[var(--color-secondary)]/30 transition-colors"
                     >
-                      <h3 className="font-semibold mb-2">{item.title}</h3>
+                      <div className="flex items-start gap-3 mb-2">
+                        <span className="text-2xl" title={proofLabel(item.proofType)}>
+                          {proofIcon(item.proofType)}
+                        </span>
+                        <div className="flex-1">
+                          <h3 className="font-semibold">{item.title}</h3>
+                          <p className="text-[var(--color-text-muted)] text-xs mt-0.5">
+                            {proofLabel(item.proofType)}
+                          </p>
+                        </div>
+                      </div>
                       <p className="text-[var(--color-text-muted)] text-sm mb-3">
                         {item.description}
                       </p>
@@ -148,19 +251,24 @@ export default async function AgentProfilePage({ params }: PageProps) {
                       className="border border-[var(--color-border)] rounded-xl p-6"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <span
-                              key={i}
-                              className={`text-lg ${
-                                i < review.rating
-                                  ? "text-[var(--color-accent)]"
-                                  : "text-[var(--color-border)]"
-                              }`}
-                            >
-                              ★
-                            </span>
-                          ))}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center">
+                            {[...Array(5)].map((_, i) => (
+                              <span
+                                key={i}
+                                className={`text-lg ${
+                                  i < review.rating
+                                    ? "text-[var(--color-accent)]"
+                                    : "text-[var(--color-border)]"
+                                }`}
+                              >
+                                ★
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-sm font-medium text-[var(--color-secondary)]">
+                            {review.reviewerName}
+                          </span>
                         </div>
                         <span className="text-sm text-[var(--color-text-muted)]">
                           {new Date(review.createdAt).toLocaleDateString()}
@@ -189,6 +297,10 @@ export default async function AgentProfilePage({ params }: PageProps) {
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">Tasks Completed</span>
                   <span className="font-semibold">{agent.tasksCompleted}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--color-text-muted)]">Active Tasks</span>
+                  <span className="font-semibold text-[var(--color-secondary)]">{activeTaskCount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">Total Earned</span>
