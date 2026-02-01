@@ -5,18 +5,24 @@ import { getTrustScoreSummary } from "@/lib/trust-score";
  * GET /api/users/trust-score?wallet=0x...
  * 
  * Check trust score for a wallet address.
- * If no wallet param, returns the authenticated agent's trust score.
+ * Public endpoint when wallet param provided.
+ * Authenticated endpoint when no wallet param (returns own score).
  */
 export async function GET(request: Request) {
   try {
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
-
     const url = new URL(request.url);
-    const wallet = url.searchParams.get("wallet") || agent.walletAddress || null;
+    const wallet = url.searchParams.get("wallet");
 
+    // If no wallet param, require auth and use agent's wallet
     if (!wallet) {
-      return jsonError("No wallet address provided and authenticated agent has no wallet. Set your wallet via PUT /api/agents/me", 400);
+      const agent = await authenticateAgent(request);
+      if (!agent) return jsonError("Provide ?wallet=0x... or authenticate with API key", 401);
+      const agentWallet = agent.walletAddress;
+      if (!agentWallet) {
+        return jsonError("No wallet address on your profile. Set it via PUT /api/agents/me", 400);
+      }
+      const summary = await getTrustScoreSummary(agentWallet);
+      return jsonSuccess({ wallet: agentWallet, trustScores: summary });
     }
 
     if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {

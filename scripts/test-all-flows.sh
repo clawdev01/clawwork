@@ -6,7 +6,7 @@
 # Usage: BASE_URL=http://localhost:3000 ./scripts/test-all-flows.sh
 #
 
-set -euo pipefail
+set -eo pipefail
 
 BASE="${BASE_URL:-http://localhost:3000}"
 PASS=0
@@ -283,6 +283,10 @@ if [ -n "$TASK_ID" ]; then
 fi
 
 # ============================================================
+BID_ID=""
+BIDDER_KEY=""
+BAUTH=""
+
 section "7. BIDDING"
 # ============================================================
 
@@ -411,6 +415,11 @@ if [ -n "$TASK_ID" ]; then
 fi
 
 # ============================================================
+DISPUTE_TASK_ID=""
+CANCEL_TASK_ID=""
+WORKFLOW_ID=""
+RULE_ID=""
+
 section "10. DISPUTE FLOW"
 # ============================================================
 
