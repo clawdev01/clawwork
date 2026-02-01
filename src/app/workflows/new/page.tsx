@@ -272,7 +272,7 @@ const STYLES = `
     max-height: 0;
     opacity: 0;
     overflow: hidden;
-    transition: max-height 300ms ease, opacity 200ms ease;
+    transition: max-height 350ms cubic-bezier(0.4, 0, 0.2, 1), opacity 250ms ease;
   }
   .agent-picker-wrapper.open {
     max-height: 600px;
@@ -283,15 +283,17 @@ const STYLES = `
   @keyframes stepIn {
     from {
       opacity: 0;
-      transform: translateY(-8px) scale(0.98);
+      max-height: 0;
+      transform: translateY(-8px) scale(0.97);
     }
     to {
       opacity: 1;
+      max-height: 200px;
       transform: translateY(0) scale(1);
     }
   }
   .step-card-enter {
-    animation: stepIn 250ms ease forwards;
+    animation: stepIn 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 
   /* Connector line */
@@ -441,8 +443,13 @@ function NewWorkflowBuilder() {
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState("");
 
-  // Start screen input
-  const [projectDesc, setProjectDesc] = useState("");
+  // Start screen
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // Multi-type initial input
+  const [inputType, setInputType] = useState<"text" | "image" | "video" | "file">("text");
+  const [inputUrl, setInputUrl] = useState("");
+  const [inputDescription, setInputDescription] = useState("");
 
   // Ref for scrolling to bottom after adding step
   const stepsEndRef = useRef<HTMLDivElement>(null);
@@ -779,6 +786,7 @@ function NewWorkflowBuilder() {
      RENDER: START SCREEN
      ═══════════════════════════════════════════════════════════════════════ */
   if (phase === "start") {
+    const pipelineTemplates = TEMPLATES.filter((t) => t.id !== "blank");
     return (
       <div className="min-h-screen bg-[var(--color-bg)]">
         <div className="max-w-3xl mx-auto px-6 py-16">
@@ -791,57 +799,68 @@ function NewWorkflowBuilder() {
             </p>
           </div>
 
-          {/* Project description input */}
-          <div className="mb-10">
-            <label className="block text-sm text-[var(--color-text-muted)] mb-2">
-              What do you want to create?
-            </label>
-            <div className="relative">
-              <textarea
-                value={projectDesc}
-                onChange={(e) => setProjectDesc(e.target.value)}
-                placeholder='Describe your project... e.g. "Create a product launch video" or "Research and write a blog post"'
-                rows={3}
-                className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-5 py-4 text-lg focus:outline-none focus:border-[var(--color-secondary)] resize-none transition-colors"
-              />
-              {projectDesc.trim() && (
+          {/* Two big option cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-10">
+            {/* Create from Scratch */}
+            <button
+              onClick={() => {
+                setWorkflowName("");
+                setWorkflowDescription("");
+                setInitialInput("");
+                setSteps([]);
+                setPhase("builder");
+              }}
+              className="template-card text-left bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 hover:cursor-pointer group"
+            >
+              <div className="text-4xl mb-4">🔨</div>
+              <h2 className="text-xl font-bold mb-2 group-hover:text-[var(--color-secondary)] transition-colors">
+                Create from Scratch
+              </h2>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Build your own custom pipeline step by step
+              </p>
+            </button>
+
+            {/* Ready Pipelines */}
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className={`template-card text-left bg-[var(--color-surface)] border rounded-2xl p-8 hover:cursor-pointer group transition-colors ${
+                showTemplates
+                  ? "border-[var(--color-secondary)]"
+                  : "border-[var(--color-border)]"
+              }`}
+            >
+              <div className="text-4xl mb-4">📋</div>
+              <h2 className="text-xl font-bold mb-2 group-hover:text-[var(--color-secondary)] transition-colors">
+                Ready Pipelines
+              </h2>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Choose a pre-built workflow template
+              </p>
+            </button>
+          </div>
+
+          {/* Template cards (shown when Ready Pipelines is selected) */}
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{
+              maxHeight: showTemplates ? "600px" : "0px",
+              opacity: showTemplates ? 1 : 0,
+            }}
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              {pipelineTemplates.map((tmpl) => (
                 <button
-                  onClick={() => {
-                    setInitialInput(projectDesc);
-                    setPhase("builder");
-                  }}
-                  className="absolute right-3 bottom-3 bg-[var(--color-secondary)] text-black font-semibold text-sm px-4 py-2 rounded-lg hover:brightness-110 transition-all"
+                  key={tmpl.id}
+                  onClick={() => applyTemplate(tmpl)}
+                  className="template-card text-left bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 hover:cursor-pointer"
                 >
-                  Start Building →
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="flex items-center gap-4 mb-10">
-            <div className="flex-1 h-px bg-[var(--color-border)]" />
-            <span className="text-sm text-[var(--color-text-muted)]">
-              or start from a template
-            </span>
-            <div className="flex-1 h-px bg-[var(--color-border)]" />
-          </div>
-
-          {/* Template grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {TEMPLATES.map((tmpl) => (
-              <button
-                key={tmpl.id}
-                onClick={() => applyTemplate(tmpl)}
-                className="template-card text-left bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:cursor-pointer"
-              >
-                <div className="text-3xl mb-3">{tmpl.icon}</div>
-                <h3 className="font-semibold text-base mb-1">{tmpl.title}</h3>
-                <p className="text-sm text-[var(--color-text-muted)] mb-3 line-clamp-2">
-                  {tmpl.description}
-                </p>
-                {tmpl.id !== "blank" && (
-                  <div className="flex items-center gap-3 text-xs text-[var(--color-text-muted)]">
+                  <div className="text-2xl mb-2">{tmpl.icon}</div>
+                  <h3 className="font-semibold text-sm mb-1">{tmpl.title}</h3>
+                  <p className="text-xs text-[var(--color-text-muted)] line-clamp-2 mb-2">
+                    {tmpl.description}
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
                     <span>
                       {tmpl.stepCount} step{tmpl.stepCount !== 1 ? "s" : ""}
                     </span>
@@ -850,19 +869,19 @@ function NewWorkflowBuilder() {
                       ~${tmpl.estimatedCost}
                     </span>
                   </div>
-                )}
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
 
-          {/* Browse templates link */}
-          <div className="text-center">
-            <Link
-              href="/workflows?tab=templates"
-              className="text-sm text-[var(--color-secondary)] hover:underline"
-            >
-              Browse all templates →
-            </Link>
+            {/* Browse templates link */}
+            <div className="text-center pb-4">
+              <Link
+                href="/workflows?tab=templates"
+                className="text-sm text-[var(--color-secondary)] hover:underline"
+              >
+                Browse all templates →
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -958,18 +977,176 @@ function NewWorkflowBuilder() {
 
       {/* ── Main content ── */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        {/* ── Initial Input ── */}
+        {/* ── Initial Input (Multi-type) ── */}
         <div className="mb-8">
-          <label className="flex items-center gap-2 text-xs uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-2">
+          <label className="flex items-center gap-2 text-xs uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3">
             <span className="text-base">📥</span> Initial Input
           </label>
-          <textarea
-            value={initialInput}
-            onChange={(e) => setInitialInput(e.target.value)}
-            placeholder="What should Step 1 work on? Be specific — the better your brief, the better the output."
-            rows={3}
-            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-[var(--color-secondary)] resize-none transition-colors"
-          />
+
+          {/* Type selector pills */}
+          <div className="flex gap-2 mb-3">
+            {([
+              { key: "text", icon: "📝", label: "Text" },
+              { key: "image", icon: "🖼️", label: "Image" },
+              { key: "video", icon: "🎬", label: "Video" },
+              { key: "file", icon: "📎", label: "File" },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setInputType(t.key)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  inputType === t.key
+                    ? "bg-[var(--color-secondary)] text-black"
+                    : "bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-secondary)]/40"
+                }`}
+              >
+                <span>{t.icon}</span>
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Input area based on type */}
+          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 transition-all">
+            {inputType === "text" && (
+              <textarea
+                value={initialInput}
+                onChange={(e) => setInitialInput(e.target.value)}
+                placeholder="Describe what you want created..."
+                rows={3}
+                className="w-full bg-transparent text-sm focus:outline-none resize-none placeholder:text-[var(--color-text-muted)]"
+              />
+            )}
+
+            {inputType === "image" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-[var(--color-text-muted)] mb-1.5">
+                    🖼️ Paste image URL
+                  </label>
+                  <input
+                    type="url"
+                    value={inputUrl}
+                    onChange={(e) => {
+                      setInputUrl(e.target.value);
+                      setInitialInput(
+                        `[Image: ${e.target.value}]${inputDescription ? ` — ${inputDescription}` : ""}`
+                      );
+                    }}
+                    placeholder="https://example.com/image.png"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
+                  />
+                  {inputUrl && inputUrl.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i) && (
+                    <div className="mt-2 rounded-lg overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg)] p-2 flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={inputUrl}
+                        alt="Preview"
+                        className="w-16 h-16 object-cover rounded-lg"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <span className="text-xs text-[var(--color-text-muted)] truncate">{inputUrl}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-[var(--color-text-muted)] mb-1.5">
+                    Description (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={inputDescription}
+                    onChange={(e) => {
+                      setInputDescription(e.target.value);
+                      setInitialInput(
+                        `[Image: ${inputUrl}]${e.target.value ? ` — ${e.target.value}` : ""}`
+                      );
+                    }}
+                    placeholder="What is this image about?"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+
+            {inputType === "video" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-[var(--color-text-muted)] mb-1.5">
+                    🎬 Paste video URL
+                  </label>
+                  <input
+                    type="url"
+                    value={inputUrl}
+                    onChange={(e) => {
+                      setInputUrl(e.target.value);
+                      setInitialInput(
+                        `[Video: ${e.target.value}]${inputDescription ? ` — ${inputDescription}` : ""}`
+                      );
+                    }}
+                    placeholder="https://youtube.com/watch?v=... or direct video URL"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[var(--color-text-muted)] mb-1.5">
+                    Description (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={inputDescription}
+                    onChange={(e) => {
+                      setInputDescription(e.target.value);
+                      setInitialInput(
+                        `[Video: ${inputUrl}]${e.target.value ? ` — ${e.target.value}` : ""}`
+                      );
+                    }}
+                    placeholder="What should be done with this video?"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+
+            {inputType === "file" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-[var(--color-text-muted)] mb-1.5">
+                    📎 Paste file URL or filename
+                  </label>
+                  <input
+                    type="text"
+                    value={inputUrl}
+                    onChange={(e) => {
+                      setInputUrl(e.target.value);
+                      setInitialInput(
+                        `[File: ${e.target.value}]${inputDescription ? ` — ${inputDescription}` : ""}`
+                      );
+                    }}
+                    placeholder="https://... or filename.csv"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[var(--color-text-muted)] mb-1.5">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={inputDescription}
+                    onChange={(e) => {
+                      setInputDescription(e.target.value);
+                      setInitialInput(
+                        `[File: ${inputUrl}]${e.target.value ? ` — ${e.target.value}` : ""}`
+                      );
+                    }}
+                    placeholder="What should be done with this file?"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Connector from input to first step ── */}
