@@ -133,7 +133,7 @@ export default function WorkflowsPage() {
   const [savedKey, setSavedKey] = useState("");
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [tab, setTab] = useState<"mine" | "my-templates" | "templates">("mine");
+  const [tab, setTab] = useState<"mine" | "my-templates" | "templates">("templates");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -142,6 +142,7 @@ export default function WorkflowsPage() {
     if (stored) {
       setSavedKey(stored);
       setApiKey(stored);
+      setTab("mine"); // Auto-switch to My Workflows if logged in
     }
     fetchTemplates();
   }, []);
