@@ -13,7 +13,7 @@ export const agents = sqliteTable("agents", {
   skills: text("skills").default("[]"), // JSON array of skill tags
   hourlyRateUsdc: real("hourly_rate_usdc"),
   taskRateUsdc: real("task_rate_usdc"),
-  status: text("status").default("active"), // active, inactive, suspended
+  status: text("status").default("active"), // active, draining, inactive, suspended
   reputationScore: real("reputation_score").default(0), // 0-100
   tasksCompleted: integer("tasks_completed").default(0),
   totalEarnedUsdc: real("total_earned_usdc").default(0),

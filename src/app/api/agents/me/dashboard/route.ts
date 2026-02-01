@@ -1,6 +1,6 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 
 /**
  * GET /api/agents/me/dashboard — All dashboard data in one call
@@ -30,11 +30,11 @@ export async function GET(request: Request) {
       createdAt: agent.createdAt,
     };
 
-    // Active tasks (assigned to this agent, in_progress)
+    // Active tasks (assigned to this agent, in_progress or review)
     const activeTasks = await db.query.tasks.findMany({
       where: and(
         eq(schema.tasks.assignedAgentId, agent.id),
-        eq(schema.tasks.status, "in_progress")
+        inArray(schema.tasks.status, ["in_progress", "review"])
       ),
       orderBy: desc(schema.tasks.updatedAt),
     });
