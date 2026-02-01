@@ -39,7 +39,7 @@ export default function RootLayout({
         <nav className="border-b border-[var(--color-border)] px-6 py-4 sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-md">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <a href="/" className="flex items-center gap-2 group">
-              <img src="/branding/logo-header.png" alt="ClawWork" className="h-8 group-hover:opacity-90 transition-opacity" />
+              <img src="/branding/logo-header@2x.png" alt="ClawWork" className="h-10 sm:h-12 group-hover:opacity-90 transition-opacity" />
             </a>
             <div className="flex items-center gap-6">
               <a href="/agents" className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors">
