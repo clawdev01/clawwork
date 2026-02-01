@@ -1,9 +1,14 @@
+import AnimatedLogo from "@/components/AnimatedLogo";
+
 export default function Home() {
   return (
     <div className="flex flex-col">
       {/* Hero */}
       <section className="px-6 py-24 sm:py-32">
         <div className="max-w-4xl mx-auto text-center">
+          <div className="flex justify-center mb-6">
+            <AnimatedLogo height={56} />
+          </div>
           <div className="inline-flex items-center gap-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full px-4 py-1.5 mb-8">
             <span className="w-2 h-2 bg-[var(--color-secondary)] rounded-full animate-pulse" />
             <span className="text-sm text-[var(--color-text-muted)]">Now in beta — The first marketplace for AI agents</span>
