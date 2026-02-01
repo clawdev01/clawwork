@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import TaskDeposit from "@/components/TaskDeposit";
+import TaskApprove from "@/components/TaskApprove";
 
 interface Task {
   id: string;
@@ -14,6 +16,8 @@ interface Task {
   requiredSkills: string[];
   status: string;
   assignedAgentId?: string;
+  escrowTxHash?: string;
+  completionTxHash?: string;
   bidCount: number;
   createdAt: string;
   updatedAt: string;
@@ -199,6 +203,50 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
         </div>
+
+        {/* Fund Task (Escrow Deposit) — shown for in_progress tasks */}
+        {task.status === "in_progress" && !task.escrowTxHash && (
+          <div className="mb-6">
+            <TaskDeposit taskId={taskId} budgetUsdc={task.budgetUsdc} apiKey={bidApiKey || (typeof window !== "undefined" ? localStorage.getItem("clawwork_api_key") || "" : "")} />
+            {!bidApiKey && !(typeof window !== "undefined" && localStorage.getItem("clawwork_api_key")) && (
+              <div className="mt-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4">
+                <label className="block text-sm font-medium mb-1">API Key (for escrow authorization)</label>
+                <input
+                  type="password"
+                  value={bidApiKey}
+                  onChange={(e) => setBidApiKey(e.target.value)}
+                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  placeholder="cw_..."
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Escrow Funded indicator */}
+        {task.escrowTxHash && (
+          <div className="mb-6 bg-[var(--color-secondary)]/10 border border-[var(--color-secondary)]/30 rounded-2xl p-4 flex items-center gap-3">
+            <span className="text-[var(--color-secondary)] text-lg">🔒</span>
+            <div>
+              <div className="text-sm font-medium text-[var(--color-secondary)]">Escrow Funded — ${task.budgetUsdc} USDC locked</div>
+              <a
+                href={`https://basescan.org/tx/${task.escrowTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[var(--color-accent)] hover:underline"
+              >
+                View transaction →
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Approve & Pay — shown for tasks in review */}
+        {task.status === "review" && (
+          <div className="mb-6">
+            <TaskApprove taskId={taskId} budgetUsdc={task.budgetUsdc} apiKey={bidApiKey || (typeof window !== "undefined" ? localStorage.getItem("clawwork_api_key") || "" : "")} />
+          </div>
+        )}
 
         {/* Submit Bid */}
         {task.status === "open" && (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import WalletBalance from "@/components/WalletBalance";
 
 interface DashboardData {
   profile: {
@@ -228,6 +229,7 @@ export default function DashboardPage() {
           <StatCard label="Earned" value={`$${data.stats.totalEarnedUsdc?.toFixed(2) || "0.00"}`} accent />
           <StatCard label="Active Tasks" value={String(data.stats.activeTasks)} accent />
           <StatCard label="Pending Bids" value={String(data.stats.pendingBids)} />
+          <WalletBalance />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
