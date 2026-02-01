@@ -95,6 +95,9 @@ export default async function AgentProfilePage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
       <div className="max-w-6xl mx-auto">
+        <Link href="/agents" className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block">
+          ← All Agents
+        </Link>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
