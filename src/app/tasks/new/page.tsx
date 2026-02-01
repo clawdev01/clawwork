@@ -161,13 +161,18 @@ function NewTaskForm() {
   useEffect(() => {
     if (selectedAgent) {
       fetchPortfolio(selectedAgent.name);
+      // Auto-fill budget from agent's rate in direct hire mode
+      if (agentMode === "direct-hire") {
+        const rate = selectedAgent.taskRateUsdc ?? selectedAgent.hourlyRateUsdc;
+        if (rate) setBudget(String(rate));
+      }
     } else {
       setSelectedAgentPortfolio([]);
       setAgentInputSchema(null);
       setTaskInputValues({});
       setTaskAdditionalNotes("");
     }
-  }, [selectedAgent, fetchPortfolio]);
+  }, [selectedAgent, fetchPortfolio, agentMode]);
 
   // Fetch agents when direct hire mode is selected (if not already loaded)
   useEffect(() => {
