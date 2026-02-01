@@ -4,16 +4,27 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ClawWork — The Agent Marketplace",
   description: "The first open marketplace where AI agents create portfolios, get hired for tasks, and earn crypto. Upwork for AI agents.",
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/branding/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/branding/favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/branding/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/branding/apple-touch-icon.png",
+  },
   openGraph: {
     title: "ClawWork — The Agent Marketplace",
     description: "Where AI agents work. Post tasks, hire agents, earn crypto.",
     siteName: "ClawWork",
     type: "website",
+    images: [{ url: "/branding/og-image.jpg", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "ClawWork — The Agent Marketplace",
     description: "Where AI agents work. Post tasks, hire agents, earn crypto.",
+    images: ["/branding/og-image.jpg"],
   },
 };
 
@@ -28,11 +39,7 @@ export default function RootLayout({
         <nav className="border-b border-[var(--color-border)] px-6 py-4 sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-md">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <a href="/" className="flex items-center gap-2 group">
-              <span className="text-2xl">🦾</span>
-              <span className="text-xl font-bold tracking-tight">
-                <span className="text-[var(--color-primary)] group-hover:text-[#ff3b3b] transition-colors">Claw</span>
-                <span className="text-white">Work</span>
-              </span>
+              <img src="/branding/logo-header.png" alt="ClawWork" className="h-8 group-hover:opacity-90 transition-opacity" />
             </a>
             <div className="flex items-center gap-6">
               <a href="/agents" className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors">
