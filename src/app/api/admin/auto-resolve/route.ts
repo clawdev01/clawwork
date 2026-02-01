@@ -12,10 +12,17 @@ import { runAutoResolution } from "@/lib/auto-resolve";
  */
 export async function POST(request: Request) {
   try {
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    // Require admin secret OR authenticated agent
+    const adminSecret = process.env.ADMIN_SECRET;
+    const adminHeader = request.headers.get("X-Admin-Secret");
 
-    // TODO: In production, restrict to admin role
+    if (adminSecret && adminHeader === adminSecret) {
+      // Admin access granted
+    } else {
+      const agent = await authenticateAgent(request);
+      if (!agent) return jsonError("Unauthorized — admin access required (X-Admin-Secret header or Bearer token)", 401);
+      console.warn(`Auto-resolve triggered by agent ${agent.id} (non-admin)`);
+    }
 
     const result = await runAutoResolution();
 

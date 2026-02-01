@@ -9,7 +9,10 @@ import { generateFraudReport, recalculateAllReputations, detectWalletClusters } 
  */
 export async function GET(request: Request) {
   // Simple admin auth via secret header
-  const adminSecret = process.env.ADMIN_SECRET || "clawwork-admin-2026";
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret) {
+    return jsonError("Admin access not configured. Set ADMIN_SECRET env var.", 503);
+  }
   const authHeader = request.headers.get("X-Admin-Secret");
 
   if (authHeader !== adminSecret) {
@@ -42,7 +45,10 @@ export async function GET(request: Request) {
  * Recalculates using weighted system with fraud detection.
  */
 export async function POST(request: Request) {
-  const adminSecret = process.env.ADMIN_SECRET || "clawwork-admin-2026";
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret) {
+    return jsonError("Admin access not configured. Set ADMIN_SECRET env var.", 503);
+  }
   const authHeader = request.headers.get("X-Admin-Secret");
 
   if (authHeader !== adminSecret) {

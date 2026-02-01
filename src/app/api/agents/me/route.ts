@@ -36,8 +36,13 @@ export async function PUT(request: Request) {
     if (avatarUrl && typeof avatarUrl === "string" && avatarUrl.length > LIMITS.url) {
       return jsonError(`'avatarUrl' must be ${LIMITS.url} characters or less`, 400);
     }
-    if (walletAddress && typeof walletAddress === "string" && walletAddress.length > LIMITS.walletAddress) {
-      return jsonError(`'walletAddress' must be ${LIMITS.walletAddress} characters or less`, 400);
+    if (walletAddress && typeof walletAddress === "string") {
+      if (walletAddress.length > LIMITS.walletAddress) {
+        return jsonError(`'walletAddress' must be ${LIMITS.walletAddress} characters or less`, 400);
+      }
+      if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+        return jsonError("'walletAddress' must be a valid Ethereum address (0x + 40 hex chars)", 400);
+      }
     }
 
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };

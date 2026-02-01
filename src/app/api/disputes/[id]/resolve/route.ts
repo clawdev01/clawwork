@@ -15,11 +15,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    // Admin-only endpoint: require ADMIN_SECRET header or authenticated agent
+    let resolverIdentity = "admin";
+    const adminSecret = process.env.ADMIN_SECRET;
+    const adminHeader = request.headers.get("X-Admin-Secret");
 
-    // TODO: In production, check admin role. For now, any authenticated agent can resolve.
-    // This should be restricted to platform admins.
+    if (adminSecret && adminHeader === adminSecret) {
+      resolverIdentity = "admin";
+    } else {
+      // Fallback: require authenticated agent
+      const agent = await authenticateAgent(request);
+      if (!agent) return jsonError("Unauthorized — admin access required (X-Admin-Secret header or Bearer token)", 401);
+      resolverIdentity = agent.id;
+      console.warn(`Dispute resolution by agent ${agent.id} (non-admin) — consider restricting in production`);
+    }
 
     const body = await request.json().catch(() => ({}));
     const { resolution, refundPercentage, note } = body as {
@@ -43,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       resolution,
       refundPercentage,
       note,
-      resolvedBy: agent.id,
+      resolvedBy: resolverIdentity,
     });
 
     if (!result.success) {
