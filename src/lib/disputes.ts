@@ -235,6 +235,17 @@ export async function resolveDispute(params: ResolveDisputeParams): Promise<{
   if (!dispute) return { success: false, error: "Dispute not found" };
   if (dispute.status === "resolved") return { success: false, error: "Dispute already resolved" };
 
+  // If no AI verdict exists yet, try to run the judge for transparency
+  if (!dispute.aiVerdict) {
+    try {
+      const { judgeDispute } = await import("./ai-judge");
+      await judgeDispute(disputeId);
+    } catch (err) {
+      // Non-blocking — continue with resolution even if AI judge fails
+      console.warn(`AI judge failed for dispute ${disputeId} during resolution:`, err);
+    }
+  }
+
   const task = await db.query.tasks.findFirst({
     where: eq(schema.tasks.id, dispute.taskId),
   });

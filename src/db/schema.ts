@@ -175,6 +175,8 @@ export const disputes = sqliteTable("disputes", {
   responseDeadline: text("response_deadline"), // ISO timestamp — other party must respond by this
   resolvedAt: text("resolved_at"),
   resolvedBy: text("resolved_by"), // admin id or "auto"
+  aiVerdict: text("ai_verdict"), // JSON — AI judge's analysis and recommendation
+  aiJudgedAt: text("ai_judged_at"), // timestamp when AI evaluated
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

@@ -12,6 +12,7 @@ import { releaseEscrow } from "./payments";
 import { updateTrustScore } from "./trust-score";
 import { getTasksForAutoApproval, getDisputesForAutoResolve } from "./abuse-prevention";
 import { resolveDispute } from "./disputes";
+import { judgeDispute } from "./ai-judge";
 
 // ============ AUTO-APPROVE STALE REVIEWS ============
 
@@ -124,29 +125,37 @@ export async function autoResolveStaleDisputes(): Promise<AutoResolveDisputeResu
 
   for (const dispute of staleDisputes) {
     try {
-      // Determine who didn't respond
-      const raisedByBuyer = dispute.raisedByRole === "buyer";
+      // Try AI judge first for a fair evaluation
+      let resolution: "full_refund" | "partial_refund" | "agent_paid" | "split";
+      let refundPercentage: number | undefined;
+      let resolveNote: string;
 
-      // If buyer raised and agent didn't respond → buyer wins (full refund)
-      // If agent raised and buyer didn't respond → agent wins (agent paid)
-      // But also check: if raised by buyer and agent didn't submit evidence, buyer wins
-      const agentResponded = !!dispute.agentEvidence;
-      const buyerResponded = !!dispute.buyerEvidence;
+      try {
+        const verdict = await judgeDispute(dispute.id);
+        resolution = verdict.recommendation;
+        refundPercentage = verdict.refundPercentage;
+        resolveNote = `AI Judge auto-resolved: score=${verdict.score}, completeness=${verdict.completeness}, quality=${verdict.qualityVsPortfolio}. ${verdict.reasoning.slice(0, 300)}`;
+      } catch (aiError: any) {
+        // AI judge failed — fall back to deadline-based logic
+        console.error(`AI judge failed for dispute ${dispute.id}:`, aiError.message);
 
-      let resolution: "full_refund" | "agent_paid";
+        const raisedByBuyer = dispute.raisedByRole === "buyer";
+        const agentResponded = !!dispute.agentEvidence;
+        const buyerResponded = !!dispute.buyerEvidence;
 
-      if (raisedByBuyer) {
-        // Buyer raised — did agent respond?
-        resolution = agentResponded ? "agent_paid" : "full_refund";
-      } else {
-        // Agent raised — did buyer respond?
-        resolution = buyerResponded ? "full_refund" : "agent_paid";
+        if (raisedByBuyer) {
+          resolution = agentResponded ? "agent_paid" : "full_refund";
+        } else {
+          resolution = buyerResponded ? "full_refund" : "agent_paid";
+        }
+        resolveNote = `Auto-resolved: AI judge unavailable, fell back to deadline logic. Non-responding party loses.`;
       }
 
       const resolveResult = await resolveDispute({
         disputeId: dispute.id,
         resolution,
-        note: `Auto-resolved: response deadline passed. Non-responding party loses.`,
+        refundPercentage,
+        note: resolveNote,
         resolvedBy: "auto",
       });
 

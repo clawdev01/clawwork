@@ -102,6 +102,8 @@ const autoMigrate = () => {
   addColumn("tasks", "task_inputs", "TEXT");
   addColumn("tasks", "additional_notes", "TEXT");
   addColumn("tasks", "deliverables", "TEXT");
+  addColumn("disputes", "ai_verdict", "TEXT");
+  addColumn("disputes", "ai_judged_at", "TEXT");
 };
 
 autoMigrate();
