@@ -68,6 +68,8 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
   const [sessionAddress, setSessionAddress] = useState<string | undefined>();
   const [sessionChainId, setSessionChainId] = useState<number | undefined>();
 
+  const [autoSignInDone, setAutoSignInDone] = useState(false);
+
   // Check existing session on mount
   const checkSession = useCallback(async () => {
     try {
@@ -78,6 +80,7 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
         setUserId(data.session.userId);
         setSessionAddress(data.session.address);
         setSessionChainId(data.session.chainId);
+        setAutoSignInDone(true); // already signed in, skip auto
       } else {
         setIsSignedIn(false);
         setUserId(undefined);
@@ -157,6 +160,23 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
       console.error("SIWE sign-in failed:", error);
     }
   }, [address, chainId, signMessageAsync]);
+
+  // Auto-sign-in: when wallet connects and no SIWE session exists, trigger sign-in automatically
+  useEffect(() => {
+    if (
+      !isLoading &&
+      isConnected &&
+      address &&
+      chainId &&
+      !isSignedIn &&
+      !autoSignInDone
+    ) {
+      setAutoSignInDone(true);
+      signIn().catch(() => {
+        console.warn("Auto SIWE sign-in failed — user can retry manually");
+      });
+    }
+  }, [isLoading, isConnected, address, chainId, isSignedIn, autoSignInDone, signIn]);
 
   const signOut = useCallback(async () => {
     await fetch("/api/siwe/logout", { method: "POST" });
