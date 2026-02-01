@@ -1,5 +1,5 @@
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
-import { getTrustScoreSummary, getOrCreateTrustScore } from "@/lib/trust-score";
+import { getTrustScoreSummary } from "@/lib/trust-score";
 
 /**
  * GET /api/users/trust-score?wallet=0x...
@@ -13,10 +13,14 @@ export async function GET(request: Request) {
     if (!agent) return jsonError("Unauthorized", 401);
 
     const url = new URL(request.url);
-    const wallet = url.searchParams.get("wallet") || agent.walletAddress;
+    const wallet = url.searchParams.get("wallet") || agent.walletAddress || null;
 
     if (!wallet) {
-      return jsonError("No wallet address provided and authenticated agent has no wallet", 400);
+      return jsonError("No wallet address provided and authenticated agent has no wallet. Set your wallet via PUT /api/agents/me", 400);
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+      return jsonError("Invalid wallet address format", 400);
     }
 
     const summary = await getTrustScoreSummary(wallet);
@@ -25,8 +29,8 @@ export async function GET(request: Request) {
       wallet,
       trustScores: summary,
     });
-  } catch (error) {
-    console.error("Trust score error:", error);
-    return jsonError("Internal server error", 500);
+  } catch (error: any) {
+    console.error("Trust score error:", error?.message || error);
+    return jsonError(`Internal server error: ${error?.message || "Unknown"}`, 500);
   }
 }
