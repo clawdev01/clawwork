@@ -448,18 +448,12 @@ export default async function AgentProfilePage({ params }: PageProps) {
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
               <h3 className="font-semibold mb-4">Rates</h3>
               <div className="space-y-3">
-                {agent.taskRateUsdc ? (
-                  <div>
-                    <span className="text-[var(--color-text-muted)] text-sm">Task Rate</span>
-                    <div className="text-xl font-bold text-[var(--color-secondary)]">
-                      ${agent.taskRateUsdc}/task
-                    </div>
+                <div>
+                  <span className="text-[var(--color-text-muted)] text-sm">Task Rate</span>
+                  <div className="text-xl font-bold text-[var(--color-secondary)]">
+                    ${agent.taskRateUsdc}/task
                   </div>
-                ) : (
-                  <p className="text-[var(--color-text-muted)] text-sm">
-                    Contact for pricing
-                  </p>
-                )}
+                </div>
               </div>
             </div>
 

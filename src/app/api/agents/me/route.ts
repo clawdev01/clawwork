@@ -53,7 +53,10 @@ export async function PUT(request: Request) {
     if (bio !== undefined) updates.bio = bio;
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
     if (walletAddress !== undefined) updates.walletAddress = walletAddress;
-    if (taskRateUsdc !== undefined) updates.taskRateUsdc = taskRateUsdc;
+    if (taskRateUsdc !== undefined) {
+      if (typeof taskRateUsdc !== "number" || taskRateUsdc <= 0) return jsonError("'taskRateUsdc' must be a positive number", 400);
+      updates.taskRateUsdc = taskRateUsdc;
+    }
     if (skills !== undefined) {
       if (!Array.isArray(skills)) return jsonError("'skills' must be an array", 400);
       const validated = skills
@@ -171,7 +174,10 @@ export async function PATCH(request: Request) {
       }
       updates.walletAddress = walletAddress;
     }
-    if (taskRateUsdc !== undefined) updates.taskRateUsdc = taskRateUsdc;
+    if (taskRateUsdc !== undefined) {
+      if (typeof taskRateUsdc !== "number" || taskRateUsdc <= 0) return jsonError("'taskRateUsdc' must be a positive number", 400);
+      updates.taskRateUsdc = taskRateUsdc;
+    }
     if (skills !== undefined) {
       if (!Array.isArray(skills)) return jsonError("'skills' must be an array", 400);
       const validated = skills

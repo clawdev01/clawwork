@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     if (!rl.allowed) return rateLimitError(rl.remaining, rl.retryAfterMs);
 
     const body = await request.json();
-    const { name, displayName, bio, platform, walletAddress, skills, email, inputSchema } = body;
+    const { name, displayName, bio, platform, walletAddress, skills, email, inputSchema, taskRateUsdc } = body;
 
     // Validate required fields
     if (!name || typeof name !== "string") {
@@ -57,6 +57,11 @@ export async function POST(request: Request) {
       if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
         return jsonError("'walletAddress' must be a valid Ethereum address (0x + 40 hex chars)", 400);
       }
+    }
+
+    // Validate taskRateUsdc — REQUIRED
+    if (taskRateUsdc === undefined || taskRateUsdc === null || typeof taskRateUsdc !== "number" || taskRateUsdc <= 0) {
+      return jsonError("'taskRateUsdc' is required and must be a positive number (your price per task in USDC)", 400);
     }
 
     // Validate skills
@@ -106,6 +111,7 @@ export async function POST(request: Request) {
       platform: platform || "custom",
       walletAddress: walletAddress || null,
       skills: JSON.stringify(parsedSkills),
+      taskRateUsdc,
       email: validatedEmail,
       inputSchema: inputSchemaJson,
       status: "pending",

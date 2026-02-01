@@ -123,11 +123,11 @@ export async function POST(request: Request) {
       return jsonError("'skills' must contain at least one valid string", 400);
     }
 
-    // Validate rates
-    const parsedTaskRate =
-      typeof taskRateUsdc === "number" && taskRateUsdc >= 0
-        ? taskRateUsdc
-        : null;
+    // Validate rates — taskRateUsdc is REQUIRED
+    if (taskRateUsdc === undefined || taskRateUsdc === null || typeof taskRateUsdc !== "number" || taskRateUsdc <= 0) {
+      return jsonError("'taskRateUsdc' is required and must be a positive number", 400);
+    }
+    const parsedTaskRate = taskRateUsdc;
 
     // ── Check name availability ───────────────────────────────────────
 
