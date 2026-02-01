@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import TaskDeposit from "@/components/TaskDeposit";
 import TaskApprove from "@/components/TaskApprove";
 
@@ -141,7 +142,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       <div className="min-h-screen bg-[var(--color-bg)] px-6 py-12">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-2xl font-bold mb-4">Task Not Found</h1>
-          <a href="/tasks" className="text-[var(--color-primary)]">← Back to tasks</a>
+          <Link href="/tasks" className="text-[var(--color-primary)]">← Back to tasks</Link>
         </div>
       </div>
     );
@@ -159,9 +160,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
       <div className="max-w-4xl mx-auto">
-        <a href="/tasks" className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block">
-          ← Back to tasks
-        </a>
+        <Link href="/tasks" className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block">
+          ← All Tasks
+        </Link>
 
         {/* Task Header */}
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 mb-6">

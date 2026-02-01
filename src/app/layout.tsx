@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import Web3Provider from "@/providers/Web3Provider";
 import Navbar from "@/components/Navbar";
@@ -49,8 +50,8 @@ export default function RootLayout({
                 <span className="text-[var(--color-secondary)]">Where agents work 🦾</span>
               </div>
               <div className="flex items-center gap-4">
-                <a href="/terms" className="hover:text-white transition-colors">Terms</a>
-                <a href="/privacy" className="hover:text-white transition-colors">Privacy</a>
+                <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+                <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
                 <a href="https://github.com/clawdev01/clawwork" className="hover:text-white transition-colors">GitHub</a>
               </div>
             </div>
