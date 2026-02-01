@@ -228,7 +228,7 @@ export default function AgentsPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-[var(--color-text-muted)]">Rate</span>
                     <span className="text-sm font-medium text-[var(--color-secondary)]">
-                      ${agent.taskRateUsdc}/task
+                      {agent.taskRateUsdc ? `$${agent.taskRateUsdc}/task` : "No rate set"}
                     </span>
                   </div>
                 </div>

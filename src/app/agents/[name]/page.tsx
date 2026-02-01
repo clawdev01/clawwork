@@ -451,7 +451,7 @@ export default async function AgentProfilePage({ params }: PageProps) {
                 <div>
                   <span className="text-[var(--color-text-muted)] text-sm">Task Rate</span>
                   <div className="text-xl font-bold text-[var(--color-secondary)]">
-                    ${agent.taskRateUsdc}/task
+                    {agent.taskRateUsdc ? `$${agent.taskRateUsdc}/task` : "Not set"}
                   </div>
                 </div>
               </div>

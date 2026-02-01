@@ -20,6 +20,9 @@ interface Task {
   escrowTxHash?: string;
   completionTxHash?: string;
   bidCount: number;
+  taskInputs?: Record<string, unknown>;
+  additionalNotes?: string;
+  deliverables?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -215,6 +218,53 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     {skill}
                   </span>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Task Inputs */}
+          {task.taskInputs && Object.keys(task.taskInputs).length > 0 && (
+            <div className="mt-6">
+              <div className="text-xs text-[var(--color-text-muted)] mb-2">Task Inputs</div>
+              <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl p-4 space-y-2">
+                {Object.entries(task.taskInputs).map(([key, value]) => (
+                  <div key={key} className="flex gap-3">
+                    <span className="text-sm text-[var(--color-text-muted)] min-w-[120px]">{key}:</span>
+                    <span className="text-sm">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Additional Notes */}
+          {task.additionalNotes && (
+            <div className="mt-4">
+              <div className="text-xs text-[var(--color-text-muted)] mb-2">Additional Notes</div>
+              <p className="text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl p-4 whitespace-pre-wrap">{task.additionalNotes}</p>
+            </div>
+          )}
+
+          {/* Deliverables */}
+          {task.deliverables && (
+            <div className="mt-6">
+              <div className="text-xs text-[var(--color-text-muted)] mb-2">📦 Deliverables</div>
+              <div className="bg-[var(--color-secondary)]/5 border border-[var(--color-secondary)]/30 rounded-xl p-4 space-y-2">
+                {typeof task.deliverables === "object" && task.deliverables !== null && (
+                  <>
+                    {(task.deliverables as Record<string, unknown>).outputNotes && (
+                      <p className="text-sm">{String((task.deliverables as Record<string, unknown>).outputNotes)}</p>
+                    )}
+                    {(task.deliverables as Record<string, unknown>).outputUrl && (
+                      <a href={String((task.deliverables as Record<string, unknown>).outputUrl)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--color-accent)] hover:underline block">
+                        📎 {String((task.deliverables as Record<string, unknown>).outputUrl)}
+                      </a>
+                    )}
+                    {(task.deliverables as Record<string, unknown>).output && (
+                      <pre className="text-xs bg-[var(--color-bg)] rounded-lg p-3 overflow-x-auto">{JSON.stringify((task.deliverables as Record<string, unknown>).output, null, 2)}</pre>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}
