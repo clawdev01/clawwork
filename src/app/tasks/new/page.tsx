@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/providers/Web3Provider";
 import { useAccount } from "wagmi";
@@ -23,6 +23,13 @@ interface AgentInfo {
   portfolioPreview?: { title: string; inputExample: string | null; outputExample: string | null };
 }
 
+interface PortfolioItem {
+  title: string;
+  description?: string | null;
+  inputExample?: string | null;
+  outputExample?: string | null;
+}
+
 function NewTaskForm() {
   const searchParams = useSearchParams();
   const agentParam = searchParams.get("agent");
@@ -42,7 +49,7 @@ function NewTaskForm() {
   const [result, setResult] = useState<{ success: boolean; message: string; taskUrl?: string } | null>(null);
 
   // Agent selection mode
-  const [agentMode, setAgentMode] = useState<AgentSelectionMode>("open-bids");
+  const [agentMode, setAgentMode] = useState<AgentSelectionMode>(agentParam ? "direct-hire" : "open-bids");
   const [minReputation, setMinReputation] = useState(50);
 
   // Direct hire state
@@ -51,6 +58,13 @@ function NewTaskForm() {
   const [agentSearch, setAgentSearch] = useState("");
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [preselectedAgentLoading, setPreselectedAgentLoading] = useState(!!agentParam);
+
+  // Whether the user chose to override the preselected agent (show full mode selector)
+  const [overridePreselection, setOverridePreselection] = useState(false);
+
+  // Portfolio data for the selected agent
+  const [selectedAgentPortfolio, setSelectedAgentPortfolio] = useState<PortfolioItem[]>([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
 
   // Auth
   const [authMode, setAuthMode] = useState<"wallet" | "apikey">("wallet");
@@ -64,6 +78,9 @@ function NewTaskForm() {
     { value: "24h", label: "24 hours", icon: "⏱️" },
     { value: "custom", label: "Custom", icon: "📅" },
   ];
+
+  // Whether to show the full agent mode selector (hide when preselected and not overridden)
+  const showAgentModeSelector = !agentParam || overridePreselection;
 
   // Handle ?agent= URL parameter — fetch and pre-select the agent
   useEffect(() => {
@@ -89,6 +106,31 @@ function NewTaskForm() {
       .catch(() => {})
       .finally(() => setPreselectedAgentLoading(false));
   }, [agentParam]);
+
+  // Fetch full portfolio when an agent is selected
+  const fetchPortfolio = useCallback(async (agentName: string) => {
+    setPortfolioLoading(true);
+    setSelectedAgentPortfolio([]);
+    try {
+      const res = await fetch(`/api/agents/${agentName}`);
+      const data = await res.json();
+      if (data.success && data.agent?.portfolio) {
+        setSelectedAgentPortfolio(data.agent.portfolio);
+      }
+    } catch {
+      // silently fail — portfolio is a nice-to-have
+    } finally {
+      setPortfolioLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedAgent) {
+      fetchPortfolio(selectedAgent.name);
+    } else {
+      setSelectedAgentPortfolio([]);
+    }
+  }, [selectedAgent, fetchPortfolio]);
 
   // Fetch agents when direct hire mode is selected (if not already loaded)
   useEffect(() => {
@@ -120,6 +162,12 @@ function NewTaskForm() {
   const parsedSkills = useMemo(
     () => skills.split(",").map((s) => s.trim()).filter(Boolean),
     [skills]
+  );
+
+  // Portfolio items that have input or output examples
+  const portfolioExamples = useMemo(
+    () => selectedAgentPortfolio.filter((p) => p.inputExample || p.outputExample),
+    [selectedAgentPortfolio]
   );
 
   // Compute deadline ISO string from option
@@ -198,9 +246,21 @@ function NewTaskForm() {
     return "★".repeat(stars) + "☆".repeat(5 - stars);
   };
 
-  const subtitle = agentMode === "direct-hire" && selectedAgent
-    ? `Hiring ${selectedAgent.displayName || selectedAgent.name} for a task`
+  const agentDisplayName = selectedAgent?.displayName || selectedAgent?.name || "";
+
+  const subtitle = agentParam && selectedAgent && !overridePreselection
+    ? `Create a task for ${agentDisplayName}`
+    : agentMode === "direct-hire" && selectedAgent
+    ? `Hiring ${agentDisplayName} for a task`
     : "Describe what you need done";
+
+  // Handle "Change agent" click from preselected card
+  const handleChangeAgent = () => {
+    setOverridePreselection(true);
+    setSelectedAgent(null);
+    setAgentMode("open-bids");
+    setSelectedAgentPortfolio([]);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
@@ -209,23 +269,60 @@ function NewTaskForm() {
           ← Back to tasks
         </a>
 
-        {/* Hiring header when pre-selected agent */}
-        {agentParam && selectedAgent && (
-          <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 rounded-2xl p-4 mb-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center text-2xl">🤖</div>
-            <div>
-              <div className="text-sm text-[var(--color-text-muted)]">Hiring</div>
-              <div className="text-lg font-bold">{selectedAgent.displayName || selectedAgent.name}</div>
-              {selectedAgent.taskRateUsdc && (
-                <div className="text-xs text-[var(--color-text-muted)]">${selectedAgent.taskRateUsdc}/task · {selectedAgent.tasksCompleted} tasks completed</div>
-              )}
+        {/* Preselected agent card (when coming from "Hire This Agent") */}
+        {agentParam && selectedAgent && !overridePreselection && (
+          <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 rounded-2xl p-5 mb-6 transition-all duration-300">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center text-3xl flex-shrink-0">
+                🤖
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-lg truncate">{agentDisplayName}</div>
+                <div className="text-sm text-yellow-400 mb-1">
+                  {renderStars(selectedAgent.reputationScore)}
+                  <span className="text-[var(--color-text-muted)] ml-1.5 text-xs">
+                    ({Math.round(selectedAgent.reputationScore)})
+                  </span>
+                </div>
+                {selectedAgent.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                    {selectedAgent.skills.slice(0, 5).map((s) => (
+                      <span
+                        key={s}
+                        className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/20"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                    {selectedAgent.skills.length > 5 && (
+                      <span className="text-[11px] text-[var(--color-text-muted)]">
+                        +{selectedAgent.skills.length - 5}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="text-xs text-[var(--color-text-muted)]">
+                  {selectedAgent.tasksCompleted} tasks completed
+                  {selectedAgent.taskRateUsdc && ` · $${selectedAgent.taskRateUsdc}/task`}
+                  {selectedAgent.hourlyRateUsdc && ` · $${selectedAgent.hourlyRateUsdc}/hr`}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <a
+                  href={`/agents/${selectedAgent.name}`}
+                  className="text-xs text-[var(--color-text-muted)] hover:text-white border border-[var(--color-border)] px-3 py-1.5 rounded-lg transition-colors text-center"
+                >
+                  View Profile
+                </a>
+                <button
+                  type="button"
+                  onClick={handleChangeAgent}
+                  className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
+                >
+                  ✕ Change agent
+                </button>
+              </div>
             </div>
-            <a
-              href={`/agents/${selectedAgent.name}`}
-              className="ml-auto text-xs text-[var(--color-text-muted)] hover:text-white border border-[var(--color-border)] px-3 py-1.5 rounded-lg transition-colors"
-            >
-              View Profile
-            </a>
           </div>
         )}
 
@@ -358,6 +455,72 @@ function NewTaskForm() {
                 />
               </div>
 
+              {/* ═══ Portfolio Writing Guide ═══ */}
+              {selectedAgent && (
+                <div
+                  className="border border-[var(--color-secondary)]/30 rounded-xl overflow-hidden transition-all duration-300"
+                  style={{ borderLeftWidth: "3px" }}
+                >
+                  <div className="px-5 py-4 bg-[var(--color-secondary)]/5">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      📋 Writing Guide
+                      <span className="text-xs font-normal text-[var(--color-text-muted)]">
+                        — examples from {agentDisplayName}&apos;s portfolio
+                      </span>
+                    </h3>
+                  </div>
+
+                  <div className="px-5 py-4 space-y-4">
+                    {portfolioLoading ? (
+                      <div className="text-sm text-[var(--color-text-muted)] py-2">Loading portfolio examples...</div>
+                    ) : portfolioExamples.length > 0 ? (
+                      <>
+                        {portfolioExamples.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-hover)] p-4 space-y-3"
+                          >
+                            <div className="font-medium text-sm">{item.title}</div>
+                            {item.inputExample && (
+                              <div>
+                                <div className="text-xs font-medium text-[var(--color-secondary)] mb-1">
+                                  📥 Perfect Input:
+                                </div>
+                                <div className="text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
+                                  {item.inputExample}
+                                </div>
+                              </div>
+                            )}
+                            {item.outputExample && (
+                              <div>
+                                <div className="text-xs font-medium text-[var(--color-primary)] mb-1">
+                                  📤 Expected Output:
+                                </div>
+                                <div className="text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
+                                  {item.outputExample}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        <p className="text-xs text-[var(--color-text-muted)] flex items-start gap-1.5 pt-1">
+                          <span>💡</span>
+                          <span>Use these examples as a guide — the closer your description matches the input format, the better the result</span>
+                        </p>
+                      </>
+                    ) : selectedAgentPortfolio.length === 0 && !portfolioLoading ? (
+                      <p className="text-sm text-[var(--color-text-muted)] py-1">
+                        This agent hasn&apos;t added portfolio examples yet
+                      </p>
+                    ) : (
+                      <p className="text-sm text-[var(--color-text-muted)] py-1">
+                        This agent&apos;s portfolio items don&apos;t include input/output examples
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* ═══ Category & Budget ═══ */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -448,210 +611,212 @@ function NewTaskForm() {
               </div>
 
               {/* ═══════════════ AGENT SELECTION MODE ═══════════════ */}
-              <div>
-                <label className="block text-sm font-medium mb-3">How should we find your agent?</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Open Bids */}
-                  <button
-                    type="button"
-                    onClick={() => { setAgentMode("open-bids"); setSelectedAgent(null); }}
-                    className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-                      agentMode === "open-bids"
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
-                        : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
-                    }`}
-                  >
-                    <div className="text-2xl mb-2">📋</div>
-                    <div className="font-semibold text-sm mb-1">Open Bids</div>
-                    <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
-                      Post publicly — agents bid, you review and pick the best one
-                    </div>
-                  </button>
-
-                  {/* Auto-Match */}
-                  <button
-                    type="button"
-                    onClick={() => { setAgentMode("auto-match"); setSelectedAgent(null); }}
-                    className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-                      agentMode === "auto-match"
-                        ? "border-[var(--color-secondary)] bg-[var(--color-secondary)]/10"
-                        : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
-                    }`}
-                  >
-                    <div className="text-2xl mb-2">🤖</div>
-                    <div className="font-semibold text-sm mb-1">Auto-Match</div>
-                    <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
-                      We&apos;ll find and assign the best agent instantly
-                    </div>
-                  </button>
-
-                  {/* Direct Hire */}
-                  <button
-                    type="button"
-                    onClick={() => setAgentMode("direct-hire")}
-                    className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-                      agentMode === "direct-hire"
-                        ? "border-[var(--color-accent,var(--color-primary))] bg-[var(--color-accent,var(--color-primary))]/10"
-                        : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
-                    }`}
-                  >
-                    <div className="text-2xl mb-2">👤</div>
-                    <div className="font-semibold text-sm mb-1">Direct Hire</div>
-                    <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
-                      Pick a specific agent from the marketplace
-                    </div>
-                  </button>
-                </div>
-
-                {/* ── Auto-Match Options ── */}
-                {agentMode === "auto-match" && (
-                  <div className="mt-4 p-4 rounded-xl border border-[var(--color-secondary)]/30 bg-[var(--color-secondary)]/5 space-y-4 transition-all duration-200">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-2">
-                        Minimum Reputation: <span className="text-white font-bold">{minReputation}</span>
-                      </label>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={minReputation}
-                        onChange={(e) => setMinReputation(parseInt(e.target.value))}
-                        className="w-full accent-[var(--color-secondary)]"
-                      />
-                      <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1">
-                        <span>0 — Any</span>
-                        <span>50 — Good</span>
-                        <span>100 — Elite</span>
+              {showAgentModeSelector && (
+                <div>
+                  <label className="block text-sm font-medium mb-3">How should we find your agent?</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Open Bids */}
+                    <button
+                      type="button"
+                      onClick={() => { setAgentMode("open-bids"); setSelectedAgent(null); }}
+                      className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                        agentMode === "open-bids"
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                          : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">📋</div>
+                      <div className="font-semibold text-sm mb-1">Open Bids</div>
+                      <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                        Post publicly — agents bid, you review and pick the best one
                       </div>
-                    </div>
-                    {parsedSkills.length > 0 && (
+                    </button>
+
+                    {/* Auto-Match */}
+                    <button
+                      type="button"
+                      onClick={() => { setAgentMode("auto-match"); setSelectedAgent(null); }}
+                      className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                        agentMode === "auto-match"
+                          ? "border-[var(--color-secondary)] bg-[var(--color-secondary)]/10"
+                          : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">🤖</div>
+                      <div className="font-semibold text-sm mb-1">Auto-Match</div>
+                      <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                        We&apos;ll find and assign the best agent instantly
+                      </div>
+                    </button>
+
+                    {/* Direct Hire */}
+                    <button
+                      type="button"
+                      onClick={() => setAgentMode("direct-hire")}
+                      className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                        agentMode === "direct-hire"
+                          ? "border-[var(--color-accent,var(--color-primary))] bg-[var(--color-accent,var(--color-primary))]/10"
+                          : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">👤</div>
+                      <div className="font-semibold text-sm mb-1">Direct Hire</div>
+                      <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                        Pick a specific agent from the marketplace
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* ── Auto-Match Options ── */}
+                  {agentMode === "auto-match" && (
+                    <div className="mt-4 p-4 rounded-xl border border-[var(--color-secondary)]/30 bg-[var(--color-secondary)]/5 space-y-4 transition-all duration-200">
                       <div>
                         <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-2">
-                          Preferred Skills (from your requirements)
+                          Minimum Reputation: <span className="text-white font-bold">{minReputation}</span>
                         </label>
-                        <div className="flex flex-wrap gap-2">
-                          {parsedSkills.map((s) => (
-                            <span
-                              key={s}
-                              className="text-xs px-2 py-1 rounded-full bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] border border-[var(--color-secondary)]/30"
-                            >
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ── Direct Hire Agent Browser ── */}
-                {agentMode === "direct-hire" && (
-                  <div className="mt-4 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-hover)] space-y-4 transition-all duration-200">
-                    {selectedAgent ? (
-                      /* Selected agent card */
-                      <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center text-lg">
-                            🤖
-                          </div>
-                          <div>
-                            <div className="font-semibold text-sm">
-                              {selectedAgent.displayName || selectedAgent.name}
-                            </div>
-                            <div className="text-xs text-[var(--color-text-muted)]">
-                              <span className="text-yellow-400">{renderStars(selectedAgent.reputationScore)}</span>
-                              {" · "}
-                              {selectedAgent.tasksCompleted} tasks
-                              {selectedAgent.taskRateUsdc && ` · $${selectedAgent.taskRateUsdc}`}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedAgent(null)}
-                          className="text-xs text-[var(--color-text-muted)] hover:text-white px-2 py-1 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-text-muted)] transition-colors"
-                        >
-                          ✕ Change
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Search */}
                         <input
-                          type="text"
-                          value={agentSearch}
-                          onChange={(e) => setAgentSearch(e.target.value)}
-                          className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                          placeholder="Search agents by name, skill, or bio..."
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={minReputation}
+                          onChange={(e) => setMinReputation(parseInt(e.target.value))}
+                          className="w-full accent-[var(--color-secondary)]"
                         />
-
-                        {/* Agent grid */}
-                        {agentsLoading ? (
-                          <div className="text-center text-sm text-[var(--color-text-muted)] py-8">Loading agents...</div>
-                        ) : filteredAgents.length === 0 ? (
-                          <div className="text-center text-sm text-[var(--color-text-muted)] py-8">
-                            {agentSearch ? "No agents match your search" : "No active agents found"}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
-                            {filteredAgents.map((agent) => (
-                              <button
-                                key={agent.id}
-                                type="button"
-                                onClick={() => setSelectedAgent(agent)}
-                                className="text-left p-3 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-primary)]/60 bg-[var(--color-bg)] hover:bg-[var(--color-primary)]/5 transition-all duration-150"
+                        <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1">
+                          <span>0 — Any</span>
+                          <span>50 — Good</span>
+                          <span>100 — Elite</span>
+                        </div>
+                      </div>
+                      {parsedSkills.length > 0 && (
+                        <div>
+                          <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-2">
+                            Preferred Skills (from your requirements)
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {parsedSkills.map((s) => (
+                              <span
+                                key={s}
+                                className="text-xs px-2 py-1 rounded-full bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] border border-[var(--color-secondary)]/30"
                               >
-                                <div className="flex items-start gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-[var(--color-primary)]/15 flex items-center justify-center text-base flex-shrink-0 mt-0.5">
-                                    🤖
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-medium text-sm truncate">
-                                      {agent.displayName || agent.name}
-                                    </div>
-                                    <div className="text-[11px] text-yellow-400 mb-1">
-                                      {renderStars(agent.reputationScore)}
-                                      <span className="text-[var(--color-text-muted)] ml-1">
-                                        ({Math.round(agent.reputationScore)})
-                                      </span>
-                                    </div>
-                                    {agent.skills.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mb-1">
-                                        {agent.skills.slice(0, 3).map((s) => (
-                                          <span
-                                            key={s}
-                                            className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-muted)]"
-                                          >
-                                            {s}
-                                          </span>
-                                        ))}
-                                        {agent.skills.length > 3 && (
-                                          <span className="text-[10px] text-[var(--color-text-muted)]">
-                                            +{agent.skills.length - 3}
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                    <div className="text-[11px] text-[var(--color-text-muted)]">
-                                      {agent.tasksCompleted} tasks done
-                                      {agent.taskRateUsdc ? ` · $${agent.taskRateUsdc}/task` : ""}
-                                    </div>
-                                    {agent.portfolioPreview && (
-                                      <div className="text-[10px] text-[var(--color-text-muted)] mt-1 italic truncate">
-                                        📄 {agent.portfolioPreview.title}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
+                                {s}
+                              </span>
                             ))}
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── Direct Hire Agent Browser ── */}
+                  {agentMode === "direct-hire" && (
+                    <div className="mt-4 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-hover)] space-y-4 transition-all duration-200">
+                      {selectedAgent ? (
+                        /* Selected agent card */
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center text-lg">
+                              🤖
+                            </div>
+                            <div>
+                              <div className="font-semibold text-sm">
+                                {selectedAgent.displayName || selectedAgent.name}
+                              </div>
+                              <div className="text-xs text-[var(--color-text-muted)]">
+                                <span className="text-yellow-400">{renderStars(selectedAgent.reputationScore)}</span>
+                                {" · "}
+                                {selectedAgent.tasksCompleted} tasks
+                                {selectedAgent.taskRateUsdc && ` · $${selectedAgent.taskRateUsdc}`}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAgent(null)}
+                            className="text-xs text-[var(--color-text-muted)] hover:text-white px-2 py-1 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-text-muted)] transition-colors"
+                          >
+                            ✕ Change
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Search */}
+                          <input
+                            type="text"
+                            value={agentSearch}
+                            onChange={(e) => setAgentSearch(e.target.value)}
+                            className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                            placeholder="Search agents by name, skill, or bio..."
+                          />
+
+                          {/* Agent grid */}
+                          {agentsLoading ? (
+                            <div className="text-center text-sm text-[var(--color-text-muted)] py-8">Loading agents...</div>
+                          ) : filteredAgents.length === 0 ? (
+                            <div className="text-center text-sm text-[var(--color-text-muted)] py-8">
+                              {agentSearch ? "No agents match your search" : "No active agents found"}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                              {filteredAgents.map((agent) => (
+                                <button
+                                  key={agent.id}
+                                  type="button"
+                                  onClick={() => setSelectedAgent(agent)}
+                                  className="text-left p-3 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-primary)]/60 bg-[var(--color-bg)] hover:bg-[var(--color-primary)]/5 transition-all duration-150"
+                                >
+                                  <div className="flex items-start gap-2.5">
+                                    <div className="w-8 h-8 rounded-full bg-[var(--color-primary)]/15 flex items-center justify-center text-base flex-shrink-0 mt-0.5">
+                                      🤖
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-medium text-sm truncate">
+                                        {agent.displayName || agent.name}
+                                      </div>
+                                      <div className="text-[11px] text-yellow-400 mb-1">
+                                        {renderStars(agent.reputationScore)}
+                                        <span className="text-[var(--color-text-muted)] ml-1">
+                                          ({Math.round(agent.reputationScore)})
+                                        </span>
+                                      </div>
+                                      {agent.skills.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mb-1">
+                                          {agent.skills.slice(0, 3).map((s) => (
+                                            <span
+                                              key={s}
+                                              className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-muted)]"
+                                            >
+                                              {s}
+                                            </span>
+                                          ))}
+                                          {agent.skills.length > 3 && (
+                                            <span className="text-[10px] text-[var(--color-text-muted)]">
+                                              +{agent.skills.length - 3}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      <div className="text-[11px] text-[var(--color-text-muted)]">
+                                        {agent.tasksCompleted} tasks done
+                                        {agent.taskRateUsdc ? ` · $${agent.taskRateUsdc}/task` : ""}
+                                      </div>
+                                      {agent.portfolioPreview && (
+                                        <div className="text-[10px] text-[var(--color-text-muted)] mt-1 italic truncate">
+                                          📄 {agent.portfolioPreview.title}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               {/* ═══════════════ END AGENT SELECTION ═══════════════ */}
 
               {/* Error */}
