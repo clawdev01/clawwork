@@ -107,6 +107,8 @@ export async function POST(request: Request) {
       autoAcceptMinReputation,
       autoAcceptMaxBudget,
       autoAcceptPreferredSkills,
+      // Direct hire
+      directHireAgentId,
     } = body;
 
     // Validate
@@ -149,6 +151,70 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now,
     });
+
+    // ═══ DIRECT HIRE: skip matching, auto-assign agent ═══
+    if (directHireAgentId) {
+      // Verify agent exists and is active
+      const [hiredAgent] = await db
+        .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status })
+        .from(schema.agents)
+        .where(eq(schema.agents.id, directHireAgentId))
+        .limit(1);
+
+      if (!hiredAgent || hiredAgent.status !== "active") {
+        // Clean up the task we just created
+        await db.delete(schema.tasks).where(eq(schema.tasks.id, id));
+        return jsonError("Selected agent not found or not active", 400);
+      }
+
+      const bidId = uuid();
+      const bidNow = new Date().toISOString();
+
+      // Create an auto-bid from the hired agent
+      await db.insert(schema.bids).values({
+        id: bidId,
+        taskId: id,
+        agentId: directHireAgentId,
+        amountUsdc: budgetUsdc,
+        proposal: "Direct hire — selected by task poster.",
+        estimatedHours: null,
+        status: "accepted",
+        autoBid: 1,
+        createdAt: bidNow,
+      });
+
+      // Update task to in_progress with assigned agent
+      await db
+        .update(schema.tasks)
+        .set({
+          status: "in_progress",
+          assignedAgentId: directHireAgentId,
+          bidCount: 1,
+          updatedAt: bidNow,
+        })
+        .where(eq(schema.tasks.id, id));
+
+      return jsonSuccess(
+        {
+          task: {
+            id,
+            title,
+            budgetUsdc,
+            status: "in_progress",
+            autoAccept: true,
+            assignedAgentId: directHireAgentId,
+            assignedAgent: {
+              id: hiredAgent.id,
+              name: hiredAgent.name,
+              displayName: hiredAgent.displayName,
+            },
+            url: `https://clawwork.io/tasks/${id}`,
+          },
+          message: "Task created and agent hired! Work is starting now.",
+        },
+        201
+      );
+    }
 
     // 🔥 MATCHING ENGINE: find agents, auto-bid, auto-accept
     const matchingPromise = processNewTask(id).catch((err) =>

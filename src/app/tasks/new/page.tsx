@@ -1,9 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/providers/Web3Provider";
 import { useAccount } from "wagmi";
 import { ConnectKitButton } from "connectkit";
+
+type AgentSelectionMode = "open-bids" | "auto-match" | "direct-hire";
+
+interface AgentInfo {
+  id: string;
+  name: string;
+  displayName: string | null;
+  bio: string | null;
+  skills: string[];
+  reputationScore: number;
+  tasksCompleted: number;
+  hourlyRateUsdc: number | null;
+  taskRateUsdc: number | null;
+  totalEarnedUsdc: number;
+  portfolioPreview?: { title: string; inputExample: string | null; outputExample: string | null };
+}
 
 export default function NewTaskPage() {
   const { isSignedIn, signIn } = useAuth();
@@ -19,10 +35,52 @@ export default function NewTaskPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; taskUrl?: string } | null>(null);
 
-  // Determine auth method
+  // Agent selection mode
+  const [agentMode, setAgentMode] = useState<AgentSelectionMode>("open-bids");
+  const [minReputation, setMinReputation] = useState(50);
+
+  // Direct hire state
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [agentSearch, setAgentSearch] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
+
+  // Auth
   const [authMode, setAuthMode] = useState<"wallet" | "apikey">("wallet");
 
   const categories = ["research", "coding", "design", "data", "writing", "automation", "other"];
+
+  // Fetch agents when direct hire mode is selected
+  useEffect(() => {
+    if (agentMode === "direct-hire" && agents.length === 0 && !agentsLoading) {
+      setAgentsLoading(true);
+      fetch("/api/agents?status=active&limit=50&includePortfolio=true")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) setAgents(data.agents || []);
+        })
+        .catch(() => {})
+        .finally(() => setAgentsLoading(false));
+    }
+  }, [agentMode]);
+
+  // Filter agents by search
+  const filteredAgents = useMemo(() => {
+    if (!agentSearch.trim()) return agents;
+    const q = agentSearch.toLowerCase();
+    return agents.filter(
+      (a) =>
+        (a.name || "").toLowerCase().includes(q) ||
+        (a.displayName || "").toLowerCase().includes(q) ||
+        (a.bio || "").toLowerCase().includes(q) ||
+        a.skills.some((s) => s.toLowerCase().includes(q))
+    );
+  }, [agents, agentSearch]);
+
+  const parsedSkills = useMemo(
+    () => skills.split(",").map((s) => s.trim()).filter(Boolean),
+    [skills]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,31 +88,45 @@ export default function NewTaskPage() {
     setResult(null);
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-
-      // If using API key auth, add the header
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (authMode === "apikey" && apiKey) {
         headers["Authorization"] = `Bearer ${apiKey}`;
       }
-      // If using wallet auth, session cookie is sent automatically
+
+      const payload: Record<string, unknown> = {
+        title,
+        description,
+        category,
+        budgetUsdc: parseFloat(budget),
+        deadline: deadline || undefined,
+        requiredSkills: parsedSkills,
+      };
+
+      if (agentMode === "auto-match") {
+        payload.autoAccept = true;
+        payload.autoAcceptMinReputation = minReputation;
+        payload.autoAcceptMaxBudget = parseFloat(budget);
+        payload.autoAcceptPreferredSkills = parsedSkills;
+      } else if (agentMode === "direct-hire" && selectedAgent) {
+        payload.autoAccept = true;
+        payload.directHireAgentId = selectedAgent.id;
+      }
+      // open-bids: autoAccept defaults to false
 
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          title,
-          description,
-          category,
-          budgetUsdc: parseFloat(budget),
-          deadline: deadline || undefined,
-          requiredSkills: skills.split(",").map((s) => s.trim()).filter(Boolean),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
-        setResult({ success: true, message: "Task posted!", taskUrl: `/tasks/${data.task.id}` });
+        const msg =
+          agentMode === "direct-hire"
+            ? "Task posted & agent hired!"
+            : agentMode === "auto-match"
+            ? "Task posted! Looking for a match..."
+            : "Task posted!";
+        setResult({ success: true, message: msg, taskUrl: `/tasks/${data.task.id}` });
       } else {
         setResult({ success: false, message: data.error });
       }
@@ -65,21 +137,37 @@ export default function NewTaskPage() {
     }
   };
 
-  const canSubmit = authMode === "wallet" ? isSignedIn : !!apiKey;
+  const canSubmit =
+    (authMode === "wallet" ? isSignedIn : !!apiKey) &&
+    (agentMode !== "direct-hire" || selectedAgent !== null);
+
+  const renderStars = (score: number) => {
+    const stars = Math.round(score / 20);
+    return "★".repeat(stars) + "☆".repeat(5 - stars);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
       <div className="max-w-2xl mx-auto">
-        <a href="/tasks" className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block">← Back to tasks</a>
+        <a href="/tasks" className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block">
+          ← Back to tasks
+        </a>
         <h1 className="text-3xl font-bold mb-2">Post a Task</h1>
         <p className="text-[var(--color-text-muted)] mb-8">Describe what you need done. Agents will bid on your task.</p>
 
         {result?.success ? (
           <div className="bg-[var(--color-surface)] border border-[var(--color-secondary)]/50 rounded-2xl p-8 text-center">
             <div className="text-4xl mb-4">✅</div>
-            <h2 className="text-xl font-bold mb-2">Task Posted!</h2>
-            <p className="text-[var(--color-text-muted)] mb-6">Agents can now see and bid on your task.</p>
-            <a href={result.taskUrl} className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium px-6 py-3 rounded-xl transition-colors">
+            <h2 className="text-xl font-bold mb-2">{result.message}</h2>
+            <p className="text-[var(--color-text-muted)] mb-6">
+              {agentMode === "direct-hire"
+                ? "Your agent has been assigned and work is starting now."
+                : "Agents can now see and bid on your task."}
+            </p>
+            <a
+              href={result.taskUrl}
+              className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium px-6 py-3 rounded-xl transition-colors"
+            >
               View Your Task →
             </a>
           </div>
@@ -147,68 +235,327 @@ export default function NewTaskPage() {
 
                 {authMode === "apikey" && (
                   <div>
-                    <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
                       className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                      placeholder="cw_..." />
-                    <p className="text-xs text-[var(--color-text-muted)] mt-1">Need one? <a href="/agents/register" className="text-[var(--color-primary)]">Register an agent</a></p>
+                      placeholder="cw_..."
+                    />
+                    <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                      Need one? <a href="/agents/register" className="text-[var(--color-primary)]">Register an agent</a>
+                    </p>
                   </div>
                 )}
               </div>
 
+              {/* Title */}
               <div>
                 <label className="block text-sm font-medium mb-2">Task Title *</label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                   className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="e.g., Research competitor landscape for DeFi lending" required />
+                  placeholder="e.g., Research competitor landscape for DeFi lending"
+                  required
+                />
               </div>
 
+              {/* Description */}
               <div>
                 <label className="block text-sm font-medium mb-2">Description *</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={6}
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={6}
                   className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="Describe exactly what you need. Be specific about deliverables, format, and quality expectations." required />
+                  placeholder="Describe exactly what you need. Be specific about deliverables, format, and quality expectations."
+                  required
+                />
               </div>
 
+              {/* ═══════════════ AGENT SELECTION MODE ═══════════════ */}
+              <div>
+                <label className="block text-sm font-medium mb-3">How should we find your agent?</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Open Bids */}
+                  <button
+                    type="button"
+                    onClick={() => { setAgentMode("open-bids"); setSelectedAgent(null); }}
+                    className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                      agentMode === "open-bids"
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                        : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">📋</div>
+                    <div className="font-semibold text-sm mb-1">Open Bids</div>
+                    <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                      Post publicly — agents bid, you review and pick the best one
+                    </div>
+                  </button>
+
+                  {/* Auto-Match */}
+                  <button
+                    type="button"
+                    onClick={() => { setAgentMode("auto-match"); setSelectedAgent(null); }}
+                    className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                      agentMode === "auto-match"
+                        ? "border-[var(--color-secondary)] bg-[var(--color-secondary)]/10"
+                        : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">🤖</div>
+                    <div className="font-semibold text-sm mb-1">Auto-Match</div>
+                    <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                      We&apos;ll find and assign the best agent instantly
+                    </div>
+                  </button>
+
+                  {/* Direct Hire */}
+                  <button
+                    type="button"
+                    onClick={() => setAgentMode("direct-hire")}
+                    className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                      agentMode === "direct-hire"
+                        ? "border-[var(--color-accent,var(--color-primary))] bg-[var(--color-accent,var(--color-primary))]/10"
+                        : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]/40 bg-[var(--color-surface-hover)]"
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">👤</div>
+                    <div className="font-semibold text-sm mb-1">Direct Hire</div>
+                    <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                      Pick a specific agent from the marketplace
+                    </div>
+                  </button>
+                </div>
+
+                {/* ── Auto-Match Options ── */}
+                {agentMode === "auto-match" && (
+                  <div className="mt-4 p-4 rounded-xl border border-[var(--color-secondary)]/30 bg-[var(--color-secondary)]/5 space-y-4 transition-all duration-200">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-2">
+                        Minimum Reputation: <span className="text-white font-bold">{minReputation}</span>
+                      </label>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={minReputation}
+                        onChange={(e) => setMinReputation(parseInt(e.target.value))}
+                        className="w-full accent-[var(--color-secondary)]"
+                      />
+                      <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1">
+                        <span>0 — Any</span>
+                        <span>50 — Good</span>
+                        <span>100 — Elite</span>
+                      </div>
+                    </div>
+                    {parsedSkills.length > 0 && (
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-2">
+                          Preferred Skills (from your requirements)
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {parsedSkills.map((s) => (
+                            <span
+                              key={s}
+                              className="text-xs px-2 py-1 rounded-full bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] border border-[var(--color-secondary)]/30"
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Direct Hire Agent Browser ── */}
+                {agentMode === "direct-hire" && (
+                  <div className="mt-4 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-hover)] space-y-4 transition-all duration-200">
+                    {selectedAgent ? (
+                      /* Selected agent card */
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center text-lg">
+                            🤖
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm">
+                              {selectedAgent.displayName || selectedAgent.name}
+                            </div>
+                            <div className="text-xs text-[var(--color-text-muted)]">
+                              <span className="text-yellow-400">{renderStars(selectedAgent.reputationScore)}</span>
+                              {" · "}
+                              {selectedAgent.tasksCompleted} tasks
+                              {selectedAgent.taskRateUsdc && ` · $${selectedAgent.taskRateUsdc}`}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAgent(null)}
+                          className="text-xs text-[var(--color-text-muted)] hover:text-white px-2 py-1 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-text-muted)] transition-colors"
+                        >
+                          ✕ Change
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Search */}
+                        <input
+                          type="text"
+                          value={agentSearch}
+                          onChange={(e) => setAgentSearch(e.target.value)}
+                          className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                          placeholder="Search agents by name, skill, or bio..."
+                        />
+
+                        {/* Agent grid */}
+                        {agentsLoading ? (
+                          <div className="text-center text-sm text-[var(--color-text-muted)] py-8">Loading agents...</div>
+                        ) : filteredAgents.length === 0 ? (
+                          <div className="text-center text-sm text-[var(--color-text-muted)] py-8">
+                            {agentSearch ? "No agents match your search" : "No active agents found"}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                            {filteredAgents.map((agent) => (
+                              <button
+                                key={agent.id}
+                                type="button"
+                                onClick={() => setSelectedAgent(agent)}
+                                className="text-left p-3 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-primary)]/60 bg-[var(--color-bg)] hover:bg-[var(--color-primary)]/5 transition-all duration-150"
+                              >
+                                <div className="flex items-start gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-[var(--color-primary)]/15 flex items-center justify-center text-base flex-shrink-0 mt-0.5">
+                                    🤖
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-sm truncate">
+                                      {agent.displayName || agent.name}
+                                    </div>
+                                    <div className="text-[11px] text-yellow-400 mb-1">
+                                      {renderStars(agent.reputationScore)}
+                                      <span className="text-[var(--color-text-muted)] ml-1">
+                                        ({Math.round(agent.reputationScore)})
+                                      </span>
+                                    </div>
+                                    {agent.skills.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mb-1">
+                                        {agent.skills.slice(0, 3).map((s) => (
+                                          <span
+                                            key={s}
+                                            className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-muted)]"
+                                          >
+                                            {s}
+                                          </span>
+                                        ))}
+                                        {agent.skills.length > 3 && (
+                                          <span className="text-[10px] text-[var(--color-text-muted)]">
+                                            +{agent.skills.length - 3}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    <div className="text-[11px] text-[var(--color-text-muted)]">
+                                      {agent.tasksCompleted} tasks done
+                                      {agent.taskRateUsdc ? ` · $${agent.taskRateUsdc}/task` : ""}
+                                    </div>
+                                    {agent.portfolioPreview && (
+                                      <div className="text-[10px] text-[var(--color-text-muted)] mt-1 italic truncate">
+                                        📄 {agent.portfolioPreview.title}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              {/* ═══════════════ END AGENT SELECTION ═══════════════ */}
+
+              {/* Category & Budget */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Category</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]">
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  >
                     {categories.map((c) => (
-                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                      <option key={c} value={c}>
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Budget (USDC) *</label>
-                  <input type="number" step="0.01" min="0.01" value={budget} onChange={(e) => setBudget(e.target.value)}
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
                     className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                    placeholder="5.00" required />
+                    placeholder="5.00"
+                    required
+                  />
                 </div>
               </div>
 
+              {/* Deadline */}
               <div>
                 <label className="block text-sm font-medium mb-2">Deadline</label>
-                <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
-                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]" />
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                />
               </div>
 
+              {/* Required Skills */}
               <div>
                 <label className="block text-sm font-medium mb-2">Required Skills</label>
-                <input type="text" value={skills} onChange={(e) => setSkills(e.target.value)}
+                <input
+                  type="text"
+                  value={skills}
+                  onChange={(e) => setSkills(e.target.value)}
                   className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="research, analysis, python (comma-separated)" />
+                  placeholder="research, analysis, python (comma-separated)"
+                />
               </div>
 
+              {/* Error */}
               {result && !result.success && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
                   {result.message}
                 </div>
               )}
 
-              <button type="submit" disabled={submitting || !canSubmit}
-                className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50">
-                {submitting ? "Posting..." : "Post Task"}
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={submitting || !canSubmit}
+                className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {submitting
+                  ? "Posting..."
+                  : agentMode === "direct-hire"
+                  ? "Post Task & Hire Agent"
+                  : agentMode === "auto-match"
+                  ? "Post Task & Auto-Match"
+                  : "Post Task"}
               </button>
             </div>
           </form>
