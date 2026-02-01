@@ -4,6 +4,8 @@ import { authenticate } from "@/lib/unified-auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { processNewTask, sendWebhook, createNotification } from "@/lib/matching";
 import { validateTaskInputs } from "@/lib/input-schema";
+import { isPlatformWalletConfigured } from "@/lib/crypto";
+import { processGaslessDeposit } from "@/lib/payments";
 import { v4 as uuid } from "uuid";
 import { eq, desc, asc, and, like, gte, lte, sql } from "drizzle-orm";
 
@@ -113,6 +115,8 @@ export async function POST(request: Request) {
       // Structured inputs
       taskInputs,
       additionalNotes,
+      // Optional: gasless escrow permit (create + fund in one call)
+      permit,
     } = body;
 
     // Validate
@@ -194,6 +198,11 @@ export async function POST(request: Request) {
 
     // ═══ DIRECT HIRE: skip matching, auto-assign agent ═══
     if (directHireAgentId) {
+      // Get poster agent for wallet address (needed for escrow)
+      const posterAgent = auth.type === "agent"
+        ? await db.query.agents.findFirst({ where: eq(schema.agents.id, posterId) })
+        : null;
+
       // Verify agent exists and is active
       const [hiredAgent] = await db
         .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status })
@@ -266,6 +275,39 @@ export async function POST(request: Request) {
         );
       }
 
+      // ═══ OPTIONAL: Process gasless escrow deposit in same call ═══
+      let escrowResult: { funded: boolean; txHash?: string; error?: string } = { funded: false };
+
+      if (permit && typeof permit === "object" && permit.v !== undefined && permit.r && permit.s && permit.deadline) {
+        if (!isPlatformWalletConfigured()) {
+          // Don't fail the task creation — just skip escrow
+          escrowResult = { funded: false, error: "Platform wallet not configured for gasless deposits" };
+        } else if (!posterAgent?.walletAddress) {
+          escrowResult = { funded: false, error: "Agent must have a wallet address for escrow" };
+        } else {
+          try {
+            const depositResult = await processGaslessDeposit({
+              taskId: id,
+              owner: posterAgent.walletAddress,
+              amount: budgetUsdc,
+              deadline: BigInt(permit.deadline),
+              v: Number(permit.v),
+              r: permit.r as `0x${string}`,
+              s: permit.s as `0x${string}`,
+            });
+
+            if (depositResult.success) {
+              escrowResult = { funded: true, txHash: depositResult.transferTxHash };
+            } else {
+              escrowResult = { funded: false, error: depositResult.error };
+            }
+          } catch (err) {
+            escrowResult = { funded: false, error: "Escrow deposit failed" };
+            console.error("Inline escrow deposit error:", err);
+          }
+        }
+      }
+
       return jsonSuccess(
         {
           task: {
@@ -282,7 +324,10 @@ export async function POST(request: Request) {
             },
             url: `https://clawwork.io/tasks/${id}`,
           },
-          message: "Task created and agent hired! Work is starting now.",
+          escrow: escrowResult,
+          message: escrowResult.funded
+            ? "Task created, agent hired, and escrow funded! Work is starting now."
+            : "Task created and agent hired! Work is starting now. Fund escrow via POST /api/tasks/:id/deposit-gasless",
         },
         201
       );
