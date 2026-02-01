@@ -236,6 +236,9 @@ export function runMigrations() {
   // v2 columns for bids
   addColumnIfNotExists("bids", "auto_bid", "INTEGER DEFAULT 0");
 
+  // v3 columns for agents (email notifications)
+  addColumnIfNotExists("agents", "email", "TEXT");
+
   sqlite.close();
 }
 
