@@ -213,6 +213,63 @@ export function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
   `);
 
+  // ============ ANTI-FRAUD TABLES ============
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS disputes (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL REFERENCES tasks(id),
+      raised_by TEXT NOT NULL,
+      raised_by_role TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      description TEXT,
+      buyer_evidence TEXT,
+      agent_evidence TEXT,
+      status TEXT DEFAULT 'open',
+      resolution TEXT,
+      resolution_note TEXT,
+      refund_percentage INTEGER,
+      response_deadline TEXT,
+      resolved_at TEXT,
+      resolved_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS trust_scores (
+      id TEXT PRIMARY KEY,
+      wallet_address TEXT NOT NULL,
+      role TEXT NOT NULL,
+      score REAL DEFAULT 50,
+      tasks_completed INTEGER DEFAULT 0,
+      tasks_disputed INTEGER DEFAULT 0,
+      disputes_won INTEGER DEFAULT 0,
+      disputes_lost INTEGER DEFAULT 0,
+      total_volume_usdc REAL DEFAULT 0,
+      flags TEXT DEFAULT '[]',
+      banned_at TEXT,
+      banned_reason TEXT,
+      last_dispute_lost_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS abuse_log (
+      id TEXT PRIMARY KEY,
+      wallet_address TEXT NOT NULL,
+      action TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      metadata TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_disputes_task_id ON disputes(task_id);
+    CREATE INDEX IF NOT EXISTS idx_disputes_raised_by ON disputes(raised_by);
+    CREATE INDEX IF NOT EXISTS idx_disputes_status ON disputes(status);
+    CREATE INDEX IF NOT EXISTS idx_trust_scores_wallet ON trust_scores(wallet_address);
+    CREATE INDEX IF NOT EXISTS idx_trust_scores_wallet_role ON trust_scores(wallet_address, role);
+    CREATE INDEX IF NOT EXISTS idx_abuse_log_wallet ON abuse_log(wallet_address);
+  `);
+
   // ============ MIGRATIONS (add columns to existing tables) ============
   const addColumnIfNotExists = (table: string, column: string, type: string) => {
     try {

@@ -5,6 +5,7 @@ import { releaseEscrow } from "@/lib/payments";
 import { notifyPaymentReceived } from "@/lib/matching";
 import { sendPaymentReceivedEmail } from "@/lib/email";
 import { completeWorkflowStep } from "@/lib/workflows";
+import { updateTrustScore } from "@/lib/trust-score";
 import { eq } from "drizzle-orm";
 
 /**
@@ -99,6 +100,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         workflowCompleted: workflowResult.workflowCompleted,
         nextTaskId: workflowResult.nextTaskId,
       };
+    }
+
+    // 📊 UPDATE TRUST SCORES
+    if (assignedAgent.walletAddress) {
+      updateTrustScore(assignedAgent.walletAddress, "agent", {
+        tasksCompleted: 1,
+        volumeUsdc: fees.agentPayout,
+      }).catch((err) => console.error("Trust score update error (agent):", err));
+    }
+    // Update buyer trust score
+    if (agent.walletAddress) {
+      updateTrustScore(agent.walletAddress, "buyer", {
+        tasksCompleted: 1,
+        volumeUsdc: task.budgetUsdc,
+      }).catch((err) => console.error("Trust score update error (buyer):", err));
     }
 
     // Notify agent about payment

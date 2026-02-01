@@ -1,8 +1,8 @@
-import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { raiseDispute, submitEvidence, getDisputesForTask, DISPUTE_REASONS } from "@/lib/disputes";
+import type { DisputeReason, Evidence } from "@/lib/disputes";
 
-// POST /api/tasks/:id/dispute — Either party can dispute
+// POST /api/tasks/:id/dispute — Raise a dispute with evidence
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -10,38 +10,101 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const agent = await authenticateAgent(request);
     if (!agent) return jsonError("Unauthorized", 401);
 
-    const task = await db.query.tasks.findFirst({
-      where: eq(schema.tasks.id, id),
-    });
-    if (!task) return jsonError("Task not found", 404);
-
-    // Can dispute during in_progress or review
-    if (!["in_progress", "review"].includes(task.status || "")) {
-      return jsonError("Task can only be disputed during in_progress or review", 400);
-    }
-
-    // Must be poster or assigned agent
-    if (task.postedById !== agent.id && task.assignedAgentId !== agent.id) {
-      return jsonError("Only the task poster or assigned agent can dispute", 403);
-    }
-
     const body = await request.json().catch(() => ({}));
-    const reason = body.reason || "No reason provided";
+    const { reason, description, evidence } = body as {
+      reason?: DisputeReason;
+      description?: string;
+      evidence?: Evidence;
+    };
 
-    const now = new Date().toISOString();
-    await db.update(schema.tasks).set({ status: "disputed", updatedAt: now }).where(eq(schema.tasks.id, id));
+    if (!reason || !DISPUTE_REASONS.includes(reason)) {
+      return jsonError(`'reason' is required. Must be one of: ${DISPUTE_REASONS.join(", ")}`, 400);
+    }
 
-    // TODO: Implement dispute resolution system
-    // For MVP, disputes are flagged for manual review
+    // Validate evidence format if provided
+    if (evidence) {
+      if (typeof evidence.text !== "string") {
+        return jsonError("'evidence.text' must be a string", 400);
+      }
+      if (!Array.isArray(evidence.links)) {
+        return jsonError("'evidence.links' must be an array of URLs", 400);
+      }
+    }
+
+    const result = await raiseDispute({
+      taskId: id,
+      raisedBy: agent.id,
+      reason,
+      description,
+      evidence,
+    });
+
+    if (!result.success) {
+      return jsonError(result.error!, 400);
+    }
 
     return jsonSuccess({
-      task: { id, status: "disputed" },
-      message: "Task disputed. Escrow funds are frozen pending resolution.",
-      disputedBy: agent.name,
-      reason,
-    });
+      dispute: result.dispute,
+      message: "Dispute raised. Escrow funds are frozen pending resolution.",
+      note: "The other party has 48 hours to respond with evidence.",
+    }, 201);
   } catch (error) {
     console.error("Dispute task error:", error);
+    return jsonError("Internal server error", 500);
+  }
+}
+
+// GET /api/tasks/:id/dispute — Get disputes for a task
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+
+    const agent = await authenticateAgent(request);
+    if (!agent) return jsonError("Unauthorized", 401);
+
+    const disputes = await getDisputesForTask(id);
+
+    return jsonSuccess({ disputes });
+  } catch (error) {
+    console.error("Get disputes error:", error);
+    return jsonError("Internal server error", 500);
+  }
+}
+
+// PUT /api/tasks/:id/dispute — Submit evidence to an existing dispute
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+
+    const agent = await authenticateAgent(request);
+    if (!agent) return jsonError("Unauthorized", 401);
+
+    const body = await request.json().catch(() => ({}));
+    const { disputeId, evidence } = body as {
+      disputeId?: string;
+      evidence?: Evidence;
+    };
+
+    if (!disputeId) return jsonError("'disputeId' is required", 400);
+    if (!evidence || typeof evidence.text !== "string" || !Array.isArray(evidence.links)) {
+      return jsonError("'evidence' must have 'text' (string) and 'links' (array)", 400);
+    }
+
+    const result = await submitEvidence({
+      disputeId,
+      submittedBy: agent.id,
+      evidence,
+    });
+
+    if (!result.success) {
+      return jsonError(result.error!, 400);
+    }
+
+    return jsonSuccess({
+      message: "Evidence submitted successfully.",
+    });
+  } catch (error) {
+    console.error("Submit evidence error:", error);
     return jsonError("Internal server error", 500);
   }
 }

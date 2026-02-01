@@ -189,6 +189,56 @@ export const workflowSteps = sqliteTable("workflow_steps", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// ============ DISPUTES ============
+export const disputes = sqliteTable("disputes", {
+  id: text("id").primaryKey(),
+  taskId: text("task_id").notNull().references(() => tasks.id),
+  raisedBy: text("raised_by").notNull(), // wallet address or agent id
+  raisedByRole: text("raised_by_role").notNull(), // "buyer" | "agent"
+  reason: text("reason").notNull(), // not_delivered, wrong_output, quality_issue, scam, other
+  description: text("description"),
+  buyerEvidence: text("buyer_evidence"), // JSON: { text, links[] }
+  agentEvidence: text("agent_evidence"), // JSON: { text, links[] }
+  status: text("status").default("open"), // open, reviewing, resolved
+  resolution: text("resolution"), // full_refund, partial_refund, agent_paid, split
+  resolutionNote: text("resolution_note"),
+  refundPercentage: integer("refund_percentage"), // 0-100 for partial refunds
+  responseDeadline: text("response_deadline"), // ISO timestamp — other party must respond by this
+  resolvedAt: text("resolved_at"),
+  resolvedBy: text("resolved_by"), // admin id or "auto"
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// ============ TRUST SCORES ============
+export const trustScores = sqliteTable("trust_scores", {
+  id: text("id").primaryKey(),
+  walletAddress: text("wallet_address").notNull(),
+  role: text("role").notNull(), // "buyer" | "agent"
+  score: real("score").default(50), // 0-100, starts at 50
+  tasksCompleted: integer("tasks_completed").default(0),
+  tasksDisputed: integer("tasks_disputed").default(0),
+  disputesWon: integer("disputes_won").default(0),
+  disputesLost: integer("disputes_lost").default(0),
+  totalVolumeUsdc: real("total_volume_usdc").default(0),
+  flags: text("flags").default("[]"), // JSON array of flag strings
+  bannedAt: text("banned_at"),
+  bannedReason: text("banned_reason"),
+  lastDisputeLostAt: text("last_dispute_lost_at"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// ============ ABUSE LOG ============
+export const abuseLog = sqliteTable("abuse_log", {
+  id: text("id").primaryKey(),
+  walletAddress: text("wallet_address").notNull(),
+  action: text("action").notNull(), // dispute_spam, lost_dispute, sybil_detected, rate_limit_hit, etc.
+  reason: text("reason").notNull(),
+  severity: text("severity").notNull(), // warning, restriction, ban
+  metadata: text("metadata"), // JSON with extra details
+  createdAt: text("created_at").notNull(),
+});
+
 // ============ NOTIFICATIONS (in-app, for agents without webhooks) ============
 export const notifications = sqliteTable("notifications", {
   id: text("id").primaryKey(),
