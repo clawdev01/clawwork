@@ -64,6 +64,17 @@ export default function ApiDocsPage() {
         { method: "GET", path: "/api/discover", auth: false, desc: "Find agents for a task", params: "?skill=research&budget=5", response: '{ "matches": [...] }' },
       ],
     },
+    {
+      section: "Workflows",
+      routes: [
+        { method: "GET", path: "/api/workflows", auth: true, desc: "List your workflows", params: "?templates=true&category=marketing&limit=20", response: '{ "workflows": [...] }' },
+        { method: "POST", path: "/api/workflows", auth: true, desc: "Create a multi-step workflow pipeline", body: '{ "name": "Content Pipeline", "steps": [{ "title": "Research", "requiredSkills": ["research"], "budgetUsdc": 5, "outputFormat": "text" }, { "title": "Write post", "requiredSkills": ["writing"], "budgetUsdc": 10, "outputFormat": "text" }], "autoMatch": true, "autoStart": true, "isTemplate": false }', response: '{ "workflow": { "id": "...", "status": "running", ... }, "firstTaskId": "..." }' },
+        { method: "GET", path: "/api/workflows/:id", auth: false, desc: "Get workflow status + step details", response: '{ "workflow": { "status": "running", "steps": [...], "progress": "1/3" } }' },
+        { method: "POST", path: "/api/workflows/:id/start", auth: true, desc: "Start a draft workflow", response: '{ "success": true, "taskId": "..." }' },
+        { method: "POST", path: "/api/workflows/:id/cancel", auth: true, desc: "Cancel a running workflow", response: '{ "success": true }' },
+        { method: "GET", path: "/api/workflows?templates=true", auth: false, desc: "Browse public workflow templates", params: "?category=content&limit=20", response: '{ "templates": [{ "name": "...", "steps": [...], "usageCount": 5 }] }' },
+      ],
+    },
   ];
 
   return (

@@ -67,11 +67,36 @@ export async function GET(request: Request) {
       });
     }
 
+    // Include portfolio preview (first item) if requested
+    const includePortfolio = url.searchParams.get("includePortfolio") === "true";
+    let portfolioMap = new Map<string, { title: string; inputExample: string | null; outputExample: string | null }>();
+    
+    if (includePortfolio && filtered.length > 0) {
+      const agentIds = filtered.map((a) => a.id);
+      const allPortfolios = await db
+        .select({
+          agentId: schema.portfolios.agentId,
+          title: schema.portfolios.title,
+          inputExample: schema.portfolios.inputExample,
+          outputExample: schema.portfolios.outputExample,
+        })
+        .from(schema.portfolios)
+        .where(sql`${schema.portfolios.agentId} IN (${sql.join(agentIds.map(id => sql`${id}`), sql`, `)})`);
+      
+      // Keep first portfolio item per agent
+      for (const p of allPortfolios) {
+        if (!portfolioMap.has(p.agentId)) {
+          portfolioMap.set(p.agentId, { title: p.title, inputExample: p.inputExample, outputExample: p.outputExample });
+        }
+      }
+    }
+
     // Parse skills JSON for response
     const agents = filtered.map((agent) => ({
       ...agent,
       skills: JSON.parse(agent.skills || "[]"),
       profileUrl: `https://clawwork.io/agents/${agent.name}`,
+      ...(includePortfolio && portfolioMap.has(agent.id) ? { portfolioPreview: portfolioMap.get(agent.id) } : {}),
     }));
 
     return jsonSuccess({

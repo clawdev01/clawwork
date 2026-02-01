@@ -12,7 +12,15 @@ interface Workflow {
   totalSteps: number;
   totalBudgetUsdc: number;
   progress: string;
+  isTemplate?: number;
   createdAt: string;
+}
+
+interface TemplateStep {
+  title: string;
+  skills: string[];
+  budgetUsdc: number;
+  outputFormat?: string;
 }
 
 interface Template {
@@ -22,6 +30,8 @@ interface Template {
   totalSteps: number;
   totalBudgetUsdc: number;
   category?: string;
+  usageCount?: number;
+  steps?: TemplateStep[];
 }
 
 function statusBadge(status: string) {
@@ -40,12 +50,90 @@ function statusBadge(status: string) {
   );
 }
 
+/* ─── Template Card ─── */
+function TemplateCard({ template }: { template: Template }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 hover:border-[var(--color-accent)]/30 transition-colors">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📋</span>
+          <h3 className="font-semibold">{template.name}</h3>
+        </div>
+        {template.category && (
+          <span className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] px-2 py-0.5 rounded-full text-[10px]">
+            {template.category}
+          </span>
+        )}
+      </div>
+
+      {template.description && (
+        <p className="text-[var(--color-text-muted)] text-sm mb-3 line-clamp-2">{template.description}</p>
+      )}
+
+      {/* Stats */}
+      <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)] mb-3">
+        <span>{template.totalSteps} steps</span>
+        <span className="text-[var(--color-secondary)] font-semibold">${template.totalBudgetUsdc?.toFixed(2)}</span>
+        {(template.usageCount ?? 0) > 0 && (
+          <span>🔄 {template.usageCount} uses</span>
+        )}
+      </div>
+
+      {/* Step preview (expandable) */}
+      {template.steps && template.steps.length > 0 && (
+        <>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] hover:text-white mb-2 transition-colors"
+          >
+            {expanded ? "▼ Hide steps" : "▶ Show steps"}
+          </button>
+          {expanded && (
+            <div className="space-y-1.5 mb-3">
+              {template.steps.map((step, i) => (
+                <div key={i} className="flex items-center gap-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-3 py-2">
+                  <span className="text-[10px] bg-[var(--color-primary)]/20 text-[var(--color-primary)] w-5 h-5 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium truncate block">{step.title}</span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {step.skills?.slice(0, 2).map((s) => (
+                        <span key={s} className="text-[9px] text-[var(--color-text-muted)]">{s}</span>
+                      ))}
+                      {step.outputFormat && (
+                        <span className="text-[9px] text-[var(--color-text-muted)]">→ {step.outputFormat}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-[var(--color-secondary)] font-semibold">${step.budgetUsdc?.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Use template button */}
+      <Link
+        href={`/workflows/new?template=${template.id}`}
+        className="block text-center bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+      >
+        Use This Template →
+      </Link>
+    </div>
+  );
+}
+
+/* ─── Main Page ─── */
 export default function WorkflowsPage() {
   const [apiKey, setApiKey] = useState("");
   const [savedKey, setSavedKey] = useState("");
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [tab, setTab] = useState<"mine" | "templates">("mine");
+  const [tab, setTab] = useState<"mine" | "my-templates" | "templates">("mine");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -93,7 +181,11 @@ export default function WorkflowsPage() {
     if (savedKey) fetchWorkflows(savedKey);
   }, [savedKey, fetchWorkflows]);
 
-  const needsApiKey = tab === "mine" && !savedKey && !loading;
+  // Split workflows into regular and templates
+  const regularWorkflows = workflows.filter((w) => !w.isTemplate);
+  const myTemplates = workflows.filter((w) => !!w.isTemplate);
+
+  const needsApiKey = (tab === "mine" || tab === "my-templates") && !savedKey && !loading;
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
@@ -114,26 +206,21 @@ export default function WorkflowsPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-1 mb-8 w-fit">
-          <button
-            onClick={() => setTab("mine")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === "mine" ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-muted)] hover:text-white"
-            }`}
-          >
-            My Workflows
-          </button>
-          <button
-            onClick={() => setTab("templates")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === "templates" ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-muted)] hover:text-white"
-            }`}
-          >
-            Templates
-          </button>
+          {(["mine", "my-templates", "templates"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tab === t ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-muted)] hover:text-white"
+              }`}
+            >
+              {t === "mine" ? "My Workflows" : t === "my-templates" ? "My Templates" : "Browse Templates"}
+            </button>
+          ))}
         </div>
 
-        {/* My Workflows Tab */}
-        {tab === "mine" && needsApiKey && (
+        {/* API Key prompt */}
+        {needsApiKey && (
           <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 max-w-md mx-auto">
             <h2 className="text-xl font-bold mb-2">Enter API Key</h2>
             <p className="text-[var(--color-text-muted)] text-sm mb-6">Enter your API key to view your workflows.</p>
@@ -160,11 +247,12 @@ export default function WorkflowsPage() {
           </div>
         )}
 
+        {/* My Workflows Tab */}
         {tab === "mine" && !needsApiKey && (
           <>
             {loading ? (
               <div className="text-center py-12 text-[var(--color-text-muted)]">Loading workflows...</div>
-            ) : workflows.length === 0 ? (
+            ) : regularWorkflows.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-5xl mb-4">🔧</div>
                 <h3 className="text-xl font-bold mb-2">No workflows yet</h3>
@@ -178,7 +266,7 @@ export default function WorkflowsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {workflows.map((w) => (
+                {regularWorkflows.map((w) => (
                   <Link
                     key={w.id}
                     href={`/workflows/${w.id}`}
@@ -220,45 +308,84 @@ export default function WorkflowsPage() {
           </>
         )}
 
-        {/* Templates Tab */}
+        {/* My Templates Tab */}
+        {tab === "my-templates" && !needsApiKey && (
+          <>
+            {loading ? (
+              <div className="text-center py-12 text-[var(--color-text-muted)]">Loading templates...</div>
+            ) : myTemplates.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-5xl mb-4">📋</div>
+                <h3 className="text-xl font-bold mb-2">No templates yet</h3>
+                <p className="text-[var(--color-text-muted)] mb-2">When you create a workflow with &quot;Save as template&quot; checked, it appears here.</p>
+                <p className="text-[var(--color-text-muted)] mb-6 text-sm">Templates let you re-use the same pipeline structure with different inputs.</p>
+                <Link
+                  href="/workflows/new"
+                  className="inline-block bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold px-6 py-3 rounded-xl transition-colors"
+                >
+                  Create a Workflow
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myTemplates.map((w) => (
+                  <div
+                    key={w.id}
+                    className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 hover:border-[var(--color-accent)]/30 transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-lg">📋</span>
+                          <h3 className="text-lg font-semibold">{w.name}</h3>
+                          <span className="text-[10px] bg-[var(--color-accent)]/15 text-[var(--color-accent)] px-2 py-0.5 rounded-full font-medium">
+                            Template
+                          </span>
+                        </div>
+                        {w.description && (
+                          <p className="text-[var(--color-text-muted)] text-sm mb-3 line-clamp-1">{w.description}</p>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+                          <span>📋 {w.totalSteps} steps</span>
+                          <span className="text-[var(--color-secondary)]">${w.totalBudgetUsdc?.toFixed(2)}</span>
+                          <span>{new Date(w.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Link
+                          href={`/workflows/${w.id}`}
+                          className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] hover:border-[var(--color-text-muted)] text-sm px-4 py-2 rounded-lg transition-colors"
+                        >
+                          View
+                        </Link>
+                        <Link
+                          href={`/workflows/new?template=${w.id}`}
+                          className="bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                        >
+                          Use Template →
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Browse Public Templates Tab */}
         {tab === "templates" && (
           <>
             {templates.length === 0 ? (
               <div className="text-center py-16">
-                <div className="text-5xl mb-4">📋</div>
-                <h3 className="text-xl font-bold mb-2">No templates yet</h3>
-                <p className="text-[var(--color-text-muted)]">Public workflow templates will appear here</p>
+                <div className="text-5xl mb-4">🌐</div>
+                <h3 className="text-xl font-bold mb-2">No public templates yet</h3>
+                <p className="text-[var(--color-text-muted)]">Community workflow templates will appear here</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {templates.map((t) => (
-                  <div
-                    key={t.id}
-                    className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 hover:border-[var(--color-accent)]/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">📋</span>
-                      <h3 className="font-semibold">{t.name}</h3>
-                    </div>
-                    {t.description && (
-                      <p className="text-[var(--color-text-muted)] text-sm mb-4 line-clamp-2">{t.description}</p>
-                    )}
-                    <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)] mb-4">
-                      <span>{t.totalSteps} steps</span>
-                      <span className="text-[var(--color-secondary)]">${t.totalBudgetUsdc?.toFixed(2)}</span>
-                      {t.category && (
-                        <span className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] px-2 py-0.5 rounded-full">
-                          {t.category}
-                        </span>
-                      )}
-                    </div>
-                    <Link
-                      href="/workflows/new"
-                      className="block text-center bg-[var(--color-surface-hover)] border border-[var(--color-border)] hover:border-[var(--color-accent)]/30 text-sm font-medium py-2 rounded-lg transition-colors"
-                    >
-                      Use Template
-                    </Link>
-                  </div>
+                  <TemplateCard key={t.id} template={t} />
                 ))}
               </div>
             )}
