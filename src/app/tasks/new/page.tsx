@@ -37,7 +37,6 @@ function NewTaskForm() {
   const { isSignedIn, signIn } = useAuth();
   const { isConnected } = useAccount();
 
-  const [apiKey, setApiKey] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("other");
@@ -65,9 +64,6 @@ function NewTaskForm() {
   // Portfolio data for the selected agent
   const [selectedAgentPortfolio, setSelectedAgentPortfolio] = useState<PortfolioItem[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
-
-  // Auth
-  const [authMode, setAuthMode] = useState<"wallet" | "apikey">("wallet");
 
   const deadlineOptions: { value: DeadlineOption; label: string; icon: string }[] = [
     { value: "asap", label: "ASAP", icon: "⚡" },
@@ -207,9 +203,6 @@ function NewTaskForm() {
 
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (authMode === "apikey" && apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
-      }
 
       const payload: Record<string, unknown> = {
         title,
@@ -256,7 +249,7 @@ function NewTaskForm() {
   };
 
   const canSubmit =
-    (authMode === "wallet" ? isSignedIn : !!apiKey) &&
+    isSignedIn &&
     (agentMode !== "direct-hire" || selectedAgent !== null);
 
   const renderStars = (score: number) => {
@@ -376,79 +369,37 @@ function NewTaskForm() {
           <form onSubmit={handleSubmit} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
             <div className="space-y-6">
               {/* ═══ Auth ═══ */}
-              <div>
-                <label className="block text-sm font-medium mb-3">How to authenticate</label>
-                <div className="flex gap-2 mb-4">
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode("wallet")}
-                    className={`flex-1 text-sm py-2 rounded-lg transition-colors border ${
-                      authMode === "wallet"
-                        ? "bg-[var(--color-primary)]/15 border-[var(--color-primary)]/40 text-[var(--color-primary)]"
-                        : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-white"
-                    }`}
-                  >
-                    🔗 Wallet
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode("apikey")}
-                    className={`flex-1 text-sm py-2 rounded-lg transition-colors border ${
-                      authMode === "apikey"
-                        ? "bg-[var(--color-primary)]/15 border-[var(--color-primary)]/40 text-[var(--color-primary)]"
-                        : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-white"
-                    }`}
-                  >
-                    🔑 API Key
-                  </button>
+              {isSignedIn ? (
+                <div className="flex items-center gap-2 text-sm text-[var(--color-secondary)]">
+                  <span className="w-2 h-2 rounded-full bg-[var(--color-secondary)]" />
+                  Wallet connected
                 </div>
-
-                {authMode === "wallet" && (
-                  <div>
-                    {isSignedIn ? (
-                      <div className="flex items-center gap-2 text-sm text-[var(--color-secondary)]">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-secondary)]" />
-                        Wallet connected & signed in
-                      </div>
-                    ) : isConnected ? (
-                      <button
-                        type="button"
-                        onClick={signIn}
-                        className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
-                      >
-                        Sign In with Wallet
-                      </button>
-                    ) : (
-                      <ConnectKitButton.Custom>
-                        {({ show }) => (
-                          <button
-                            type="button"
-                            onClick={show}
-                            className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
-                          >
-                            Connect Wallet
-                          </button>
-                        )}
-                      </ConnectKitButton.Custom>
-                    )}
-                  </div>
-                )}
-
-                {authMode === "apikey" && (
-                  <div>
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                      placeholder="cw_..."
-                    />
-                    <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                      Need one? <a href="/agents/register" className="text-[var(--color-primary)]">Register an agent</a>
-                    </p>
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-xl p-5">
+                  <p className="text-sm font-medium mb-3">Connect your wallet to post a task</p>
+                  {isConnected ? (
+                    <button
+                      type="button"
+                      onClick={signIn}
+                      className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
+                    >
+                      Sign In with Wallet
+                    </button>
+                  ) : (
+                    <ConnectKitButton.Custom>
+                      {({ show }) => (
+                        <button
+                          type="button"
+                          onClick={show}
+                          className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors"
+                        >
+                          Connect Wallet
+                        </button>
+                      )}
+                    </ConnectKitButton.Custom>
+                  )}
+                </div>
+              )}
 
               {/* ═══ Title ═══ */}
               <div>
