@@ -217,7 +217,7 @@ function NewTaskForm() {
         category,
         budgetUsdc: parseFloat(budget),
         deadline: computeDeadline(),
-        requiredSkills: parsedSkills,
+        requiredSkills: agentMode === "direct-hire" && selectedAgent ? selectedAgent.skills : parsedSkills,
       };
 
       if (agentMode === "auto-match") {
@@ -569,29 +569,31 @@ function NewTaskForm() {
                 )}
               </div>
 
-              {/* ═══ Required Skills ═══ */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Required Skills</label>
-                <input
-                  type="text"
-                  value={skills}
-                  onChange={(e) => setSkills(e.target.value)}
-                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="research, analysis, python (comma-separated)"
-                />
-                {parsedSkills.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {parsedSkills.map((s) => (
-                      <span
-                        key={s}
-                        className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/20"
-                      >
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* ═══ Required Skills (hidden when agent is pre-selected) ═══ */}
+              {!(agentParam && selectedAgent && !overridePreselection) && agentMode !== "direct-hire" ? (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Required Skills</label>
+                  <input
+                    type="text"
+                    value={skills}
+                    onChange={(e) => setSkills(e.target.value)}
+                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                    placeholder="research, analysis, python (comma-separated)"
+                  />
+                  {parsedSkills.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {parsedSkills.map((s) => (
+                        <span
+                          key={s}
+                          className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/20"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               {/* ═══ Deadline ═══ */}
               <div>
