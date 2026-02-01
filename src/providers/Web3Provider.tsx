@@ -70,8 +70,41 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
 
   const [autoSignInDone, setAutoSignInDone] = useState(false);
 
-  // Check existing session on mount
+  // Persist auth state in localStorage so it survives full page reloads
+  const saveAuthLocal = useCallback((data: { address: string; userId: string; chainId: number }) => {
+    try {
+      localStorage.setItem("clawwork-auth", JSON.stringify(data));
+    } catch {}
+  }, []);
+
+  const clearAuthLocal = useCallback(() => {
+    try {
+      localStorage.removeItem("clawwork-auth");
+    } catch {}
+  }, []);
+
+  const loadAuthLocal = useCallback((): { address: string; userId: string; chainId: number } | null => {
+    try {
+      const raw = localStorage.getItem("clawwork-auth");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Check existing session on mount — use localStorage as instant cache
   const checkSession = useCallback(async () => {
+    // 1. Instant restore from localStorage
+    const cached = loadAuthLocal();
+    if (cached) {
+      setIsSignedIn(true);
+      setUserId(cached.userId);
+      setSessionAddress(cached.address);
+      setSessionChainId(cached.chainId);
+      setAutoSignInDone(true);
+    }
+
+    // 2. Verify with server in background
     try {
       const res = await fetch("/api/siwe/session");
       const data = await res.json();
@@ -80,19 +113,26 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
         setUserId(data.session.userId);
         setSessionAddress(data.session.address);
         setSessionChainId(data.session.chainId);
-        setAutoSignInDone(true); // already signed in, skip auto
-      } else {
+        setAutoSignInDone(true);
+        saveAuthLocal({
+          address: data.session.address,
+          userId: data.session.userId,
+          chainId: data.session.chainId,
+        });
+      } else if (!cached) {
+        // Only clear if we didn't have cached data
         setIsSignedIn(false);
         setUserId(undefined);
         setSessionAddress(undefined);
         setSessionChainId(undefined);
       }
+      // If cached but server says no → keep cached state, will re-auth on next action
     } catch {
-      setIsSignedIn(false);
+      if (!cached) setIsSignedIn(false);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadAuthLocal, saveAuthLocal]);
 
   useEffect(() => {
     checkSession();
@@ -107,6 +147,7 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
         setUserId(undefined);
         setSessionAddress(undefined);
         setSessionChainId(undefined);
+        clearAuthLocal();
       });
     } else if (
       isConnected &&
@@ -121,9 +162,10 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
         setUserId(undefined);
         setSessionAddress(undefined);
         setSessionChainId(undefined);
+        clearAuthLocal();
       });
     }
-  }, [isConnected, address, isSignedIn, sessionAddress]);
+  }, [isConnected, address, isSignedIn, sessionAddress, clearAuthLocal]);
 
   const signIn = useCallback(async () => {
     if (!address || !chainId) return;
@@ -155,11 +197,16 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
         setUserId(data.userId);
         setSessionAddress(data.address);
         setSessionChainId(data.chainId);
+        saveAuthLocal({
+          address: data.address,
+          userId: data.userId,
+          chainId: data.chainId,
+        });
       }
     } catch (error) {
       console.error("SIWE sign-in failed:", error);
     }
-  }, [address, chainId, signMessageAsync]);
+  }, [address, chainId, signMessageAsync, saveAuthLocal]);
 
   // Auto-sign-in: when wallet connects and no SIWE session exists, trigger sign-in automatically
   useEffect(() => {
@@ -184,8 +231,9 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
     setUserId(undefined);
     setSessionAddress(undefined);
     setSessionChainId(undefined);
+    clearAuthLocal();
     disconnect();
-  }, [disconnect]);
+  }, [disconnect, clearAuthLocal]);
 
   return (
     <AuthContext.Provider

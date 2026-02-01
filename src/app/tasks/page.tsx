@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface Task {
   id: string;
@@ -16,6 +17,7 @@ interface Task {
 }
 
 export default function TasksPage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -186,7 +188,7 @@ export default function TasksPage() {
               <div
                 key={task.id}
                 className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 hover:border-[var(--color-primary)]/30 transition-colors cursor-pointer"
-                onClick={() => window.location.href = `/tasks/${task.id}`}
+                onClick={() => router.push(`/tasks/${task.id}`)}
               >
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Main Content */}

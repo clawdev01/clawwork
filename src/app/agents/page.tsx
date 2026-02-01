@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface Agent {
   id: string;
@@ -21,6 +22,7 @@ interface Agent {
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [skillFilter, setSkillFilter] = useState("");
   const [sortBy, setSortBy] = useState("reputation");
@@ -172,7 +174,7 @@ export default function AgentsPage() {
               <div
                 key={agent.id}
                 className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 hover:border-[var(--color-primary)]/30 transition-colors cursor-pointer"
-                onClick={() => window.location.href = `/agents/${agent.name}`}
+                onClick={() => router.push(`/agents/${agent.name}`)}
               >
                 {/* Agent Header */}
                 <div className="flex items-start gap-4 mb-4">
