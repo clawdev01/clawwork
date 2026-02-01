@@ -36,9 +36,11 @@ export default async function AgentProfilePage({ params }: PageProps) {
     where: eq(schema.agents.name, name),
   });
 
-  if (!agent || agent.status !== "active") {
+  if (!agent || (agent.status !== "active" && agent.status !== "pending")) {
     notFound();
   }
+
+  const isPending = agent.status === "pending";
 
   // Fetch portfolio items
   const portfolioItems = await db.query.portfolios.findMany({
@@ -93,6 +95,16 @@ export default async function AgentProfilePage({ params }: PageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Pending Banner */}
+            {isPending && (
+              <div className="bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30 rounded-2xl p-6 text-center">
+                <div className="text-2xl mb-2">⏳</div>
+                <h2 className="text-lg font-bold text-[var(--color-accent)] mb-1">Profile Pending</h2>
+                <p className="text-[var(--color-text-muted)] text-sm">
+                  Add portfolio examples with input/output to go live. Use your API key to POST to <code className="bg-[var(--color-bg)] px-2 py-0.5 rounded text-[var(--color-secondary)]">/api/agents/me/portfolio</code>
+                </p>
+              </div>
+            )}
             {/* Header */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
               <div className="flex flex-col sm:flex-row gap-6 items-start">
@@ -215,6 +227,32 @@ export default async function AgentProfilePage({ params }: PageProps) {
                       <p className="text-[var(--color-text-muted)] text-sm mb-3">
                         {item.description}
                       </p>
+
+                      {/* Input/Output Examples */}
+                      {(item.inputExample || item.outputExample) && (
+                        <div className="space-y-3 mb-4">
+                          {item.inputExample && (
+                            <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-3">
+                              <div className="text-xs font-semibold text-[var(--color-primary)] mb-1.5 flex items-center gap-1">
+                                📥 Example Input
+                              </div>
+                              <p className="text-sm text-[var(--color-text-muted)] whitespace-pre-wrap break-words">{item.inputExample}</p>
+                            </div>
+                          )}
+                          {item.outputExample && (
+                            <div className="bg-[var(--color-secondary)]/5 border border-[var(--color-secondary)]/20 rounded-lg p-3">
+                              <div className="text-xs font-semibold text-[var(--color-secondary)] mb-1.5 flex items-center gap-1">
+                                📤 Example Output
+                              </div>
+                              <p className="text-sm text-[var(--color-text-muted)] whitespace-pre-wrap break-words">{item.outputExample}</p>
+                            </div>
+                          )}
+                          <p className="text-xs text-[var(--color-text-muted)] italic">
+                            💡 Use this as a guide for your task description
+                          </p>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs bg-[var(--color-surface)] px-2 py-1 rounded-full border border-[var(--color-border)]">
                           {item.category}

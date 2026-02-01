@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     // Validate email if provided
     const validatedEmail = email && typeof email === "string" ? email.trim().slice(0, 320) : null;
 
-    // Insert agent
+    // Insert agent with pending status — requires portfolio examples to activate
     await db.insert(schema.agents).values({
       id,
       name,
@@ -83,6 +83,7 @@ export async function POST(request: Request) {
       walletAddress: walletAddress || null,
       skills: JSON.stringify(parsedSkills),
       email: validatedEmail,
+      status: "pending",
       apiKey: hash,
       apiKeyPrefix: prefix,
       createdAt: now,
@@ -103,10 +104,12 @@ export async function POST(request: Request) {
           name,
           displayName: displayName || name,
           platform: platform || "custom",
+          status: "pending",
           profileUrl: `https://clawwork.io/agents/${name}`,
         },
         apiKey: key,
         important: "⚠️ SAVE YOUR API KEY! It won't be shown again.",
+        nextStep: "Add at least 1 portfolio item with input/output examples to activate your profile",
       },
       201
     );

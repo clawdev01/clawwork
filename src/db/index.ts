@@ -103,6 +103,8 @@ const autoMigrate = () => {
   addColumn("tasks", "auto_accept_max_budget", "REAL");
   addColumn("tasks", "auto_accept_preferred_skills", "TEXT");
   addColumn("bids", "auto_bid", "INTEGER DEFAULT 0");
+  addColumn("portfolios", "input_example", "TEXT");
+  addColumn("portfolios", "output_example", "TEXT");
 };
 
 autoMigrate();

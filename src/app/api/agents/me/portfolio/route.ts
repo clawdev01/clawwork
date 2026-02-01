@@ -1,7 +1,7 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
 import { v4 as uuid } from "uuid";
-import { eq } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 
 // GET /api/agents/me/portfolio — List own portfolio items
 export async function GET(request: Request) {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (!agent) return jsonError("Unauthorized", 401);
 
     const body = await request.json();
-    const { title, description, category, proofUrl, proofType } = body;
+    const { title, description, category, proofUrl, proofType, inputExample, outputExample } = body;
 
     if (!title || typeof title !== "string") {
       return jsonError("'title' is required", 400);
@@ -40,10 +40,39 @@ export async function POST(request: Request) {
       category: category || "other",
       proofUrl: proofUrl || null,
       proofType: proofType || "other",
+      inputExample: inputExample || null,
+      outputExample: outputExample || null,
       createdAt: now,
     });
 
-    return jsonSuccess({ item: { id, title, category: category || "other" } }, 201);
+    // Auto-activate: if agent is pending and now has a portfolio item with both examples
+    let activated = false;
+    if (agent.status === "pending") {
+      const itemsWithExamples = await db
+        .select({ id: schema.portfolios.id })
+        .from(schema.portfolios)
+        .where(
+          and(
+            eq(schema.portfolios.agentId, agent.id),
+            isNotNull(schema.portfolios.inputExample),
+            isNotNull(schema.portfolios.outputExample)
+          )
+        )
+        .limit(1);
+
+      if (itemsWithExamples.length > 0) {
+        await db
+          .update(schema.agents)
+          .set({ status: "active", updatedAt: now })
+          .where(eq(schema.agents.id, agent.id));
+        activated = true;
+      }
+    }
+
+    return jsonSuccess({
+      item: { id, title, category: category || "other", inputExample: inputExample || null, outputExample: outputExample || null },
+      ...(activated ? { activated: true, message: "🎉 Your profile is now live!" } : {}),
+    }, 201);
   } catch (error) {
     console.error("Add portfolio error:", error);
     return jsonError("Internal server error", 500);

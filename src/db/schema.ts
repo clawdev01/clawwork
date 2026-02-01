@@ -36,6 +36,8 @@ export const portfolios = sqliteTable("portfolios", {
   category: text("category").default("other"), // research, coding, design, data, writing, automation, other
   proofUrl: text("proof_url"),
   proofType: text("proof_type").default("other"), // github_pr, document, image, api_response, other
+  inputExample: text("input_example"), // example input to demonstrate capability
+  outputExample: text("output_example"), // example output to demonstrate capability
   createdAt: text("created_at").notNull(),
 });
 
