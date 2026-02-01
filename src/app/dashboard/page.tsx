@@ -90,23 +90,28 @@ function AvailabilityToggle({
   status,
   schedule,
   apiKey,
+  activeTasks,
   onUpdate,
 }: {
   status: string;
   schedule: AvailabilitySchedule | null;
   apiKey: string;
+  activeTasks: number;
   onUpdate: () => void;
 }) {
   const [toggling, setToggling] = useState(false);
   const isActive = status === "active";
+  const isDraining = status === "draining";
+  const isInactive = status === "inactive";
 
   const toggleStatus = async () => {
     setToggling(true);
     try {
+      const newStatus = isActive || isDraining ? "inactive" : "active";
       const res = await fetch("/api/agents/me", {
         method: "PATCH",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ status: isActive ? "inactive" : "active" }),
+        body: JSON.stringify({ status: newStatus }),
       });
       const json = await res.json();
       if (json.success) onUpdate();
@@ -123,23 +128,43 @@ function AvailabilityToggle({
     ? "Always available"
     : null;
 
+  const borderColor = isActive
+    ? "bg-[var(--color-secondary)]/5 border-[var(--color-secondary)]/30"
+    : isDraining
+    ? "bg-[var(--color-accent)]/5 border-[var(--color-accent)]/30"
+    : "bg-[var(--color-primary)]/5 border-[var(--color-primary)]/30";
+
+  const statusIcon = isActive ? "🟢" : isDraining ? "⏳" : "🔴";
+  const statusTitle = isActive
+    ? "Your agent is receiving tasks"
+    : isDraining
+    ? `Finishing ${activeTasks} active task${activeTasks !== 1 ? "s" : ""}... will pause automatically`
+    : "Your agent is paused";
+  const statusDesc = isActive
+    ? "Visible in search · Eligible for auto-matching · Accepting bids"
+    : isDraining
+    ? "Hidden from search · No new tasks · Completing current work"
+    : "Hidden from search · Not receiving new tasks";
+
+  const buttonLabel = isActive
+    ? "Pause After Current Tasks"
+    : isDraining
+    ? "Resume (Cancel Pause)"
+    : "Activate Agent";
+
+  const buttonStyle = isInactive
+    ? "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/80 text-white"
+    : isDraining
+    ? "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/80 text-white"
+    : "bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-white";
+
   return (
-    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border transition-colors ${
-      isActive
-        ? "bg-[var(--color-secondary)]/5 border-[var(--color-secondary)]/30"
-        : "bg-[var(--color-primary)]/5 border-[var(--color-primary)]/30"
-    }`}>
+    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border transition-colors ${borderColor}`}>
       <div className="flex items-center gap-3">
-        <span className="text-2xl">{isActive ? "🟢" : "🔴"}</span>
+        <span className="text-2xl">{statusIcon}</span>
         <div>
-          <p className="font-semibold">
-            {isActive ? "Your agent is receiving tasks" : "Your agent is paused"}
-          </p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {isActive
-              ? "Visible in search · Eligible for auto-matching · Accepting bids"
-              : "Hidden from search · Not receiving new tasks"}
-          </p>
+          <p className="font-semibold">{statusTitle}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">{statusDesc}</p>
           {scheduleLabel && (
             <p className="text-xs text-[var(--color-text-muted)] mt-1">📅 {scheduleLabel}</p>
           )}
@@ -148,13 +173,9 @@ function AvailabilityToggle({
       <button
         onClick={toggleStatus}
         disabled={toggling}
-        className={`whitespace-nowrap font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 ${
-          isActive
-            ? "bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-white"
-            : "bg-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/80 text-white"
-        }`}
+        className={`whitespace-nowrap font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 ${buttonStyle}`}
       >
-        {toggling ? "..." : isActive ? "Pause Agent" : "Activate Agent"}
+        {toggling ? "..." : buttonLabel}
       </button>
     </div>
   );
@@ -315,6 +336,7 @@ export default function DashboardPage() {
           status={data.profile.status}
           schedule={data.profile.availabilitySchedule}
           apiKey={savedKey}
+          activeTasks={data.stats.activeTasks}
           onUpdate={() => fetchDashboard(savedKey)}
         />
 

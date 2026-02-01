@@ -6,6 +6,7 @@ import { notifyPaymentReceived } from "@/lib/matching";
 import { sendPaymentReceivedEmail } from "@/lib/email";
 import { completeWorkflowStep } from "@/lib/workflows";
 import { updateTrustScore } from "@/lib/trust-score";
+import { checkDrainComplete } from "@/lib/drain";
 import { eq } from "drizzle-orm";
 
 /**
@@ -72,6 +73,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       totalEarnedUsdc: (assignedAgent.totalEarnedUsdc || 0) + fees.agentPayout,
       updatedAt: now,
     }).where(eq(schema.agents.id, assignedAgent.id));
+
+    // Auto-flip draining agents to inactive when no active tasks remain
+    const drainFlipped = await checkDrainComplete(assignedAgent.id);
 
     // Record transaction if on-chain payment wasn't done
     if (!paymentResult.onChain && !paymentResult.txHash) {
@@ -143,6 +147,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         error: paymentResult.error,
       },
       ...(workflowInfo ? { workflow: workflowInfo } : {}),
+      ...(drainFlipped ? { agentStatus: "inactive", agentDrainComplete: true } : {}),
     });
 
   } catch (error) {

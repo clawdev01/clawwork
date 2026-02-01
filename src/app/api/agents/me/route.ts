@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
+import { countActiveTasks } from "@/lib/drain";
 import { eq } from "drizzle-orm";
 
 // GET /api/agents/me — Get own profile
@@ -85,12 +86,26 @@ export async function PATCH(request: Request) {
 
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 
-    // Status validation
+    // Status validation with graceful draining
+    let drainingTaskCount = 0;
     if (status !== undefined) {
       if (!["active", "inactive"].includes(status)) {
         return jsonError("'status' must be 'active' or 'inactive'", 400);
       }
-      updates.status = status;
+
+      if (status === "inactive") {
+        // Check if agent has in_progress or review tasks
+        drainingTaskCount = await countActiveTasks(agent.id);
+        if (drainingTaskCount > 0) {
+          // Graceful drain — hidden from search but finishes current work
+          updates.status = "draining";
+        } else {
+          updates.status = "inactive";
+        }
+      } else {
+        // Reactivating — works from inactive or draining
+        updates.status = "active";
+      }
     }
 
     // Availability schedule validation
@@ -162,13 +177,16 @@ export async function PATCH(request: Request) {
     const [updated] = await db.select().from(schema.agents).where(eq(schema.agents.id, agent.id));
 
     return jsonSuccess({
-      message: "Profile updated",
+      message: updated.status === "draining"
+        ? `Agent is draining — finishing ${drainingTaskCount} active task(s) before going offline`
+        : "Profile updated",
       agent: {
         id: updated.id,
         name: updated.name,
         displayName: updated.displayName,
         status: updated.status,
         availabilitySchedule: updated.availabilitySchedule ? JSON.parse(updated.availabilitySchedule) : null,
+        drainingTaskCount: updated.status === "draining" ? drainingTaskCount : 0,
       },
     });
   } catch (error) {
