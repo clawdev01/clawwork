@@ -164,11 +164,28 @@ function NewTaskForm() {
     [skills]
   );
 
-  // Portfolio items that have input or output examples
-  const portfolioExamples = useMemo(
-    () => selectedAgentPortfolio.filter((p) => p.inputExample || p.outputExample),
-    [selectedAgentPortfolio]
-  );
+  // Portfolio items — prefer those with examples, but show all if none have examples
+  const portfolioExamples = useMemo(() => {
+    const withExamples = selectedAgentPortfolio.filter((p) => p.inputExample || p.outputExample);
+    return withExamples.length > 0 ? withExamples : selectedAgentPortfolio;
+  }, [selectedAgentPortfolio]);
+
+  // Auto-fill category from agent skills when agent is pre-selected
+  useEffect(() => {
+    if (!selectedAgent || category !== "other") return;
+    const skillCategoryMap: Record<string, string> = {
+      research: "research", analysis: "research", summarization: "research",
+      coding: "coding", typescript: "coding", python: "coding", solidity: "coding",
+      design: "design", "ui-ux": "design", figma: "design",
+      "data-analysis": "data", sql: "data", statistics: "data",
+      writing: "writing", copywriting: "writing", "content-creation": "writing", seo: "writing",
+      automation: "automation", "api-integration": "automation",
+    };
+    for (const skill of selectedAgent.skills) {
+      const cat = skillCategoryMap[skill.toLowerCase()];
+      if (cat) { setCategory(cat); break; }
+    }
+  }, [selectedAgent]);
 
   // Compute deadline ISO string from option
   const computeDeadline = (): string | undefined => {
@@ -265,9 +282,12 @@ function NewTaskForm() {
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
       <div className="max-w-2xl mx-auto">
-        <a href="/tasks" className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block">
-          ← Back to tasks
-        </a>
+        <button
+          onClick={() => window.history.back()}
+          className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block bg-transparent border-none cursor-pointer"
+        >
+          ← Back
+        </button>
 
         {/* Preselected agent card (when coming from "Hire This Agent") */}
         {agentParam && selectedAgent && !overridePreselection && (
@@ -472,51 +492,58 @@ function NewTaskForm() {
 
                   <div className="px-5 py-4 space-y-4">
                     {portfolioLoading ? (
-                      <div className="text-sm text-[var(--color-text-muted)] py-2">Loading portfolio examples...</div>
+                      <div className="text-sm text-[var(--color-text-muted)] py-2">Loading portfolio...</div>
                     ) : portfolioExamples.length > 0 ? (
                       <>
-                        {portfolioExamples.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-hover)] p-4 space-y-3"
-                          >
-                            <div className="font-medium text-sm">{item.title}</div>
-                            {item.inputExample && (
-                              <div>
-                                <div className="text-xs font-medium text-[var(--color-secondary)] mb-1">
-                                  📥 Perfect Input:
+                        {portfolioExamples.map((item, idx) => {
+                          const hasExamples = item.inputExample || item.outputExample;
+                          return (
+                            <div
+                              key={idx}
+                              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-hover)] p-4 space-y-3"
+                            >
+                              <div className="font-medium text-sm">{item.title}</div>
+                              {item.description && !hasExamples && (
+                                <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                                  {item.description}
                                 </div>
-                                <div className="text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
-                                  {item.inputExample}
+                              )}
+                              {item.inputExample && (
+                                <div>
+                                  <div className="text-xs font-medium text-[var(--color-secondary)] mb-1">
+                                    📥 Perfect Input:
+                                  </div>
+                                  <div className="text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
+                                    {item.inputExample}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {item.outputExample && (
-                              <div>
-                                <div className="text-xs font-medium text-[var(--color-primary)] mb-1">
-                                  📤 Expected Output:
+                              )}
+                              {item.outputExample && (
+                                <div>
+                                  <div className="text-xs font-medium text-[var(--color-primary)] mb-1">
+                                    📤 Expected Output:
+                                  </div>
+                                  <div className="text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
+                                    {item.outputExample}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
-                                  {item.outputExample}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                              )}
+                            </div>
+                          );
+                        })}
                         <p className="text-xs text-[var(--color-text-muted)] flex items-start gap-1.5 pt-1">
                           <span>💡</span>
-                          <span>Use these examples as a guide — the closer your description matches the input format, the better the result</span>
+                          <span>{portfolioExamples.some(p => p.inputExample)
+                            ? "Use these examples as a guide — the closer your description matches the input format, the better the result"
+                            : "Review this agent\u0027s past work to understand their style and capabilities"
+                          }</span>
                         </p>
                       </>
-                    ) : selectedAgentPortfolio.length === 0 && !portfolioLoading ? (
+                    ) : !portfolioLoading ? (
                       <p className="text-sm text-[var(--color-text-muted)] py-1">
-                        This agent hasn&apos;t added portfolio examples yet
+                        This agent hasn&apos;t added portfolio items yet
                       </p>
-                    ) : (
-                      <p className="text-sm text-[var(--color-text-muted)] py-1">
-                        This agent&apos;s portfolio items don&apos;t include input/output examples
-                      </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )}
