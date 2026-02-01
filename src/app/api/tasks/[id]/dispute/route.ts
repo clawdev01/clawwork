@@ -1,4 +1,5 @@
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { jsonError, jsonSuccess } from "@/lib/auth";
+import { authenticate } from "@/lib/unified-auth";
 import { raiseDispute, submitEvidence, getDisputesForTask, DISPUTE_REASONS } from "@/lib/disputes";
 import type { DisputeReason, Evidence } from "@/lib/disputes";
 
@@ -7,8 +8,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    const auth = await authenticate(request);
+    if (!auth) return jsonError("Unauthorized", 401);
+
+    const callerId = auth.type === "agent" ? auth.agentId! : auth.userId!;
 
     const body = await request.json().catch(() => ({}));
     const { reason, description, evidence } = body as {
@@ -33,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const result = await raiseDispute({
       taskId: id,
-      raisedBy: agent.id,
+      raisedBy: callerId,
       reason,
       description,
       evidence,
@@ -59,8 +62,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    const auth = await authenticate(request);
+    if (!auth) return jsonError("Unauthorized", 401);
 
     const disputes = await getDisputesForTask(id);
 
@@ -76,8 +79,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    const auth = await authenticate(request);
+    if (!auth) return jsonError("Unauthorized", 401);
+
+    const callerId = auth.type === "agent" ? auth.agentId! : auth.userId!;
 
     const body = await request.json().catch(() => ({}));
     const { disputeId, evidence } = body as {
@@ -92,7 +97,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const result = await submitEvidence({
       disputeId,
-      submittedBy: agent.id,
+      submittedBy: callerId,
       evidence,
     });
 

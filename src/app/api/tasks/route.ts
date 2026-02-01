@@ -2,7 +2,7 @@ import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
 import { authenticate } from "@/lib/unified-auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
-import { processNewTask } from "@/lib/matching";
+import { processNewTask, sendWebhook, createNotification } from "@/lib/matching";
 import { validateTaskInputs } from "@/lib/input-schema";
 import { v4 as uuid } from "uuid";
 import { eq, desc, asc, and, like, gte, lte, sql } from "drizzle-orm";
@@ -233,6 +233,38 @@ export async function POST(request: Request) {
           updatedAt: bidNow,
         })
         .where(eq(schema.tasks.id, id));
+
+      // Fetch full hired agent record for webhook
+      const [fullHiredAgent] = await db
+        .select()
+        .from(schema.agents)
+        .where(eq(schema.agents.id, directHireAgentId))
+        .limit(1);
+
+      // Fetch task record for notification helper
+      const createdTask = await db.query.tasks.findFirst({
+        where: eq(schema.tasks.id, id),
+      });
+
+      // Send webhook notification to hired agent
+      if (fullHiredAgent?.webhookUrl && createdTask) {
+        sendWebhook(fullHiredAgent, "task_assigned", {
+          taskId: id,
+          title,
+          description,
+          budgetUsdc,
+          taskInputs: taskInputs || null,
+          additionalNotes: additionalNotesStr,
+          directHire: true,
+        }).catch((err) => console.error("Direct hire webhook error:", err));
+      }
+
+      // Create in-app notification for hired agent
+      if (createdTask) {
+        createNotification(directHireAgentId, "task_assigned", createdTask).catch((err) =>
+          console.error("Direct hire notification error:", err)
+        );
+      }
 
       return jsonSuccess(
         {

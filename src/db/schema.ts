@@ -68,6 +68,7 @@ export const tasks = sqliteTable("tasks", {
   assignedAgentId: text("assigned_agent_id").references(() => agents.id),
   taskInputs: text("task_inputs"), // JSON — filled-in values matching agent's inputSchema
   additionalNotes: text("additional_notes"), // free-form extra context from employer
+  deliverables: text("deliverables"), // JSON — agent's output/proof
   escrowTxHash: text("escrow_tx_hash"),
   completionTxHash: text("completion_tx_hash"),
   bidCount: integer("bid_count").default(0),

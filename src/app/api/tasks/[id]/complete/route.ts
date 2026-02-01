@@ -3,6 +3,7 @@ import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 
 // POST /api/tasks/:id/complete — Agent marks task as complete (moves to review)
+// Optionally accepts deliverables in the same call
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -17,8 +18,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (task.status !== "in_progress") return jsonError("Task must be in_progress to complete", 400);
     if (task.assignedAgentId !== agent.id) return jsonError("Only the assigned agent can mark as complete", 403);
 
+    const body = await request.json().catch(() => ({}));
+    const { output, outputUrl, outputNotes } = body as {
+      output?: Record<string, unknown>;
+      outputUrl?: string;
+      outputNotes?: string;
+    };
+
     const now = new Date().toISOString();
-    await db.update(schema.tasks).set({ status: "review", updatedAt: now }).where(eq(schema.tasks.id, id));
+    const updateData: Record<string, unknown> = { status: "review", updatedAt: now };
+
+    // If deliverables provided, store them
+    if (output || outputUrl || outputNotes) {
+      updateData.deliverables = JSON.stringify({
+        output: output || null,
+        outputUrl: outputUrl || null,
+        outputNotes: outputNotes || null,
+        deliveredAt: now,
+      });
+    }
+
+    await db.update(schema.tasks).set(updateData).where(eq(schema.tasks.id, id));
 
     return jsonSuccess({ task: { id, status: "review" }, message: "Task submitted for review. Waiting for poster approval." });
   } catch (error) {

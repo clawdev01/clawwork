@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { jsonError, jsonSuccess } from "@/lib/auth";
+import { authenticate } from "@/lib/unified-auth";
 import { calculateFees } from "@/lib/crypto";
 import { releaseEscrow } from "@/lib/payments";
 import { notifyPaymentReceived } from "@/lib/matching";
@@ -17,8 +18,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    const auth = await authenticate(request);
+    if (!auth) return jsonError("Unauthorized", 401);
+
+    const callerId = auth.type === "agent" ? auth.agentId! : auth.userId!;
 
     const body = await request.json().catch(() => ({}));
 
@@ -27,7 +30,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
     if (!task) return jsonError("Task not found", 404);
     if (task.status !== "review") return jsonError("Task must be in review to approve", 400);
-    if (task.postedById !== agent.id) return jsonError("Only the task poster can approve", 403);
+    if (task.postedById !== callerId) return jsonError("Only the task poster can approve", 403);
+
+    // Fetch agent record if caller is an agent (needed for wallet-based trust scoring below)
+    const agent = auth.type === "agent"
+      ? await db.query.agents.findFirst({ where: eq(schema.agents.id, auth.agentId!) })
+      : null;
 
     const now = new Date().toISOString();
 
@@ -96,8 +104,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }).catch((err) => console.error("Trust score update error (agent):", err));
     }
     // Update buyer trust score
-    if (agent.walletAddress) {
-      updateTrustScore(agent.walletAddress, "buyer", {
+    const buyerWallet = auth.walletAddress || (agent?.walletAddress ?? null);
+    if (buyerWallet) {
+      updateTrustScore(buyerWallet, "buyer", {
         tasksCompleted: 1,
         volumeUsdc: task.budgetUsdc,
       }).catch((err) => console.error("Trust score update error (buyer):", err));

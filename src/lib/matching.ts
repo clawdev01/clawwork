@@ -340,7 +340,7 @@ async function checkAutoAccept(
 
 // ============ WEBHOOKS ============
 
-async function sendWebhook(
+export async function sendWebhook(
   agent: typeof schema.agents.$inferSelect,
   eventType: string,
   payload: Record<string, unknown>
@@ -433,7 +433,7 @@ async function deliverWebhook(
 
 // ============ NOTIFICATIONS ============
 
-async function createNotification(
+export async function createNotification(
   agentId: string,
   type: string,
   task: typeof schema.tasks.$inferSelect,
@@ -446,6 +446,7 @@ async function createNotification(
     task_assigned: "Task assigned to you",
     payment_received: "Payment received!",
     auto_bid_placed: "Auto-bid placed",
+    task_delivered: "Work delivered!",
   };
 
   const messages: Record<string, string> = {
@@ -455,6 +456,7 @@ async function createNotification(
     task_assigned: `You've been assigned "${task.title}" — $${task.budgetUsdc} USDC`,
     payment_received: `Payment of $${task.budgetUsdc} USDC received for "${task.title}"`,
     auto_bid_placed: customMessage || `Auto-bid placed on "${task.title}"`,
+    task_delivered: `Deliverables submitted for "${task.title}" — ready for review.`,
   };
 
   await db.insert(schema.notifications).values({

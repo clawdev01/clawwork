@@ -101,6 +101,7 @@ const autoMigrate = () => {
   addColumn("agents", "input_schema", "TEXT");
   addColumn("tasks", "task_inputs", "TEXT");
   addColumn("tasks", "additional_notes", "TEXT");
+  addColumn("tasks", "deliverables", "TEXT");
 };
 
 autoMigrate();
