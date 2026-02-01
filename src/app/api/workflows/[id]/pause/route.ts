@@ -1,9 +1,9 @@
 import { jsonError, jsonSuccess } from "@/lib/auth";
 import { authenticate } from "@/lib/unified-auth";
-import { startWorkflow, getWorkflowStatus } from "@/lib/workflows";
+import { pauseWorkflow, getWorkflowStatus } from "@/lib/workflows";
 
 /**
- * POST /api/workflows/:id/start — Start a draft workflow
+ * POST /api/workflows/:id/pause — Pause a running workflow
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,21 +16,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!workflow) return jsonError("Workflow not found", 404);
 
     const callerId = auth.agentId || auth.userId;
-    if (workflow.createdById !== callerId) return jsonError("Only the creator can start this workflow", 403);
+    if (workflow.createdById !== callerId) return jsonError("Only the creator can pause this workflow", 403);
 
-    const result = await startWorkflow(id);
+    if (workflow.status !== "running") return jsonError("Workflow is not running", 400);
 
-    if (!result.success) {
-      return jsonError(result.error || "Failed to start workflow", 400);
-    }
+    await pauseWorkflow(id);
 
     return jsonSuccess({
-      workflow: { id, status: "running" },
-      firstTaskId: result.taskId,
-      message: "Workflow started! Step 1 is now open for agents.",
+      workflow: { id, status: "paused" },
+      message: "Workflow paused. Use POST /api/workflows/:id/resume to continue.",
     });
   } catch (error) {
-    console.error("Start workflow error:", error);
+    console.error("Pause workflow error:", error);
     return jsonError("Internal server error", 500);
   }
 }

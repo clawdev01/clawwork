@@ -13,6 +13,7 @@ interface Workflow {
   status: string;
   currentStep: number;
   totalSteps: number;
+  completedSteps?: number;
   totalBudgetUsdc: number;
   progress: string;
   isTemplate?: number;
@@ -343,7 +344,7 @@ export default function WorkflowsPage() {
                         <div className="w-32 h-2 bg-[var(--color-border)] rounded-full mt-2 overflow-hidden">
                           <div
                             className="h-full bg-[var(--color-secondary)] rounded-full transition-all"
-                            style={{ width: `${w.totalSteps > 0 ? (w.currentStep / w.totalSteps) * 100 : 0}%` }}
+                            style={{ width: `${w.totalSteps > 0 ? ((w.completedSteps ?? (w.currentStep + 1)) / w.totalSteps) * 100 : 0}%` }}
                           />
                         </div>
                       </div>

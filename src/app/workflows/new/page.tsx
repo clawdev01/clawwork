@@ -585,6 +585,13 @@ function NewWorkflowBuilder() {
     closePicker = true
   ) => {
     const firstPortfolio = agent.portfolio?.[0];
+    // Auto-generate step title from agent's primary skill
+    const agentDisplay = agent.displayName || agent.name;
+    const primarySkill = agent.skills?.[0];
+    const autoTitle = primarySkill
+      ? `${primarySkill.charAt(0).toUpperCase() + primarySkill.slice(1)} by ${agentDisplay}`
+      : `Task by ${agentDisplay}`;
+
     const newStep: PipelineStep = {
       uid: uid(),
       agentId: agent.id,
@@ -594,7 +601,7 @@ function NewWorkflowBuilder() {
       agentTasksCompleted: agent.tasksCompleted,
       agentPortfolioPreview: firstPortfolio || undefined,
       agentSkills: agent.skills || [],
-      title: "",
+      title: autoTitle,
       description: "",
       budgetUsdc: agent.taskRateUsdc || 5,
       outputFormat: "text",
@@ -1210,6 +1217,7 @@ function NewWorkflowBuilder() {
                     step={step}
                     index={idx}
                     total={steps.length}
+                    autoMatch={autoMatch}
                     onConfigure={() => setConfigStepIdx(idx)}
                     onRemove={() => removeStep(idx)}
                     onTitleChange={(title) => updateStep(idx, { title })}
@@ -1249,10 +1257,27 @@ function NewWorkflowBuilder() {
                   }}
                 />
 
-                {/* Arrow to next step */}
+                {/* Arrow to next step with data flow annotation */}
                 {idx < steps.length - 1 && (
                   <div className="flow-connector my-1">
-                    <div className="line" style={{ height: 12 }} />
+                    <div className="line" style={{ height: 8 }} />
+                    {(() => {
+                      const currentOutput = step.outputFormat || "text";
+                      const nextInput = steps[idx + 1]?.outputFormat || "text";
+                      const icon = OUTPUT_ICONS[currentOutput] || "📦";
+                      // Check format compatibility
+                      const compatible = currentOutput === nextInput || nextInput === "text" || currentOutput === "text";
+                      return (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                          compatible
+                            ? "border-[var(--color-border)] text-[var(--color-text-muted)]"
+                            : "border-[var(--color-accent)] text-[var(--color-accent)]"
+                        }`}>
+                          {!compatible && "⚠️ "}{icon} {currentOutput} →
+                        </span>
+                      );
+                    })()}
+                    <div className="line" style={{ height: 4 }} />
                     <div className="arrow" />
                   </div>
                 )}
@@ -1288,17 +1313,19 @@ function NewWorkflowBuilder() {
                 {steps.length} step{steps.length !== 1 ? "s" : ""}
               </span>
               <div className="h-8 w-px bg-[var(--color-border)] hidden sm:block" />
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoMatch}
-                  onChange={(e) => setAutoMatch(e.target.checked)}
-                  className="accent-[var(--color-secondary)] w-4 h-4"
-                />
-                <span className="text-sm text-[var(--color-text-muted)]">
-                  Auto-match
+              <button
+                onClick={() => setAutoMatch(!autoMatch)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                  autoMatch
+                    ? "border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]"
+                    : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]"
+                }`}
+              >
+                {autoMatch ? "🤖 Auto-Match" : "✋ Manual"}
+                <span className="text-xs font-normal hidden sm:inline">
+                  {autoMatch ? "— ClawWork finds the best agents" : "— You assign agents to each step"}
                 </span>
-              </label>
+              </button>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -1378,6 +1405,7 @@ function StepCard({
   step,
   index,
   total,
+  autoMatch,
   onConfigure,
   onRemove,
   onTitleChange,
@@ -1385,6 +1413,7 @@ function StepCard({
   step: PipelineStep;
   index: number;
   total: number;
+  autoMatch: boolean;
   onConfigure: () => void;
   onRemove: () => void;
   onTitleChange: (title: string) => void;
@@ -1422,6 +1451,11 @@ function StepCard({
               {!isUnassigned && (
                 <span className="text-xs text-[var(--color-text-muted)]">
                   {renderStars(step.agentReputationScore)}
+                </span>
+              )}
+              {isUnassigned && !autoMatch && (
+                <span className="text-[10px] bg-[var(--color-accent)]/15 text-[var(--color-accent)] px-1.5 py-0.5 rounded-full font-medium" title="No agent assigned — assign manually or enable auto-match">
+                  ⚠️ No agent
                 </span>
               )}
             </div>

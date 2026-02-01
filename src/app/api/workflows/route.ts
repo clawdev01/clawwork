@@ -1,5 +1,5 @@
 import { db, schema } from "@/db";
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { jsonError, jsonSuccess } from "@/lib/auth";
 import { authenticate } from "@/lib/unified-auth";
 import { createWorkflow, startWorkflow, listTemplates } from "@/lib/workflows";
 import { eq, desc } from "drizzle-orm";
@@ -46,12 +46,24 @@ export async function GET(request: Request) {
       workflows = allWorkflows.filter((w) => creatorIds.includes(w.createdById)).slice(0, limit);
     }
 
+    // Fetch completed step counts for each workflow
+    const workflowsWithProgress = await Promise.all(
+      workflows.map(async (w) => {
+        const steps = await db.query.workflowSteps.findMany({
+          where: eq(schema.workflowSteps.workflowId, w.id),
+        });
+        const completedSteps = steps.filter((s) => s.status === "completed").length;
+        return {
+          ...w,
+          completedSteps,
+          progress: `${completedSteps}/${w.totalSteps}`,
+        };
+      })
+    );
+
     return jsonSuccess({
-      workflows: workflows.map((w) => ({
-        ...w,
-        progress: `${w.currentStep}/${w.totalSteps}`,
-      })),
-      total: workflows.length,
+      workflows: workflowsWithProgress,
+      total: workflowsWithProgress.length,
     });
   } catch (error) {
     console.error("List workflows error:", error);
@@ -85,7 +97,7 @@ export async function POST(request: Request) {
     const creatorId = auth.type === "agent" ? auth.agentId! : auth.userId!;
 
     const body = await request.json();
-    const { name, description, steps, autoMatch, autoStart, isTemplate, templateCategory } = body;
+    const { name, description, steps, autoMatch, autoStart, isTemplate, templateCategory, initialInput } = body;
 
     if (!name || typeof name !== "string") {
       return jsonError("'name' is required", 400);
@@ -106,6 +118,11 @@ export async function POST(request: Request) {
       }
     }
 
+    // If initialInput is provided, ensure step[0] has it as inputDescription
+    if (initialInput && steps[0] && !steps[0].inputDescription) {
+      steps[0].inputDescription = initialInput;
+    }
+
     const { workflowId, totalBudget } = await createWorkflow(creatorId, {
       name,
       description,
@@ -113,6 +130,7 @@ export async function POST(request: Request) {
       autoMatch: autoMatch !== false,
       isTemplate: !!isTemplate,
       templateCategory,
+      initialInput: initialInput || undefined,
     });
 
     const response: Record<string, unknown> = {

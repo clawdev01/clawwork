@@ -38,6 +38,7 @@ export interface CreateWorkflowInput {
   autoMatch?: boolean;
   isTemplate?: boolean;
   templateCategory?: string;
+  initialInput?: string;
 }
 
 // ============ CREATE WORKFLOW ============
@@ -70,6 +71,8 @@ export async function createWorkflow(
   // Create steps
   for (let i = 0; i < input.steps.length; i++) {
     const step = input.steps[i];
+    // For step 0, use initialInput as inputDescription if not already set
+    const stepInputDescription = step.inputDescription || (i === 0 ? input.initialInput || null : null);
     await db.insert(schema.workflowSteps).values({
       id: uuid(),
       workflowId,
@@ -80,7 +83,7 @@ export async function createWorkflow(
       category: step.category || "other",
       budgetUsdc: step.budgetUsdc,
       inputFrom: i > 0 ? `step_${i - 1}` : null,
-      inputDescription: step.inputDescription || null,
+      inputDescription: stepInputDescription,
       outputFormat: step.outputFormat || "text",
       outputDescription: step.outputDescription || null,
       status: "pending",
@@ -356,6 +359,52 @@ export async function createFromTemplate(
 }
 
 // ============ PAUSE / CANCEL ============
+
+export async function resumeWorkflow(workflowId: string): Promise<{
+  success: boolean;
+  taskId?: string;
+  error?: string;
+}> {
+  try {
+    const workflow = await db.query.workflows.findFirst({
+      where: eq(schema.workflows.id, workflowId),
+    });
+    if (!workflow) return { success: false, error: "Workflow not found" };
+    if (workflow.status !== "paused") return { success: false, error: "Workflow is not paused" };
+
+    const now = new Date().toISOString();
+
+    // Set status back to running
+    await db.update(schema.workflows).set({
+      status: "running",
+      updatedAt: now,
+    }).where(eq(schema.workflows.id, workflowId));
+
+    // Check if the current step needs re-activation
+    const currentStepIndex = workflow.currentStep || 0;
+    const steps = await db.query.workflowSteps.findMany({
+      where: eq(schema.workflowSteps.workflowId, workflowId),
+      orderBy: asc(schema.workflowSteps.stepIndex),
+    });
+
+    const currentStep = steps.find((s) => s.stepIndex === currentStepIndex);
+    if (currentStep && currentStep.status === "open" && currentStep.taskId) {
+      // Step already has an active task — just resume
+      return { success: true, taskId: currentStep.taskId };
+    }
+
+    // If current step is still pending (no task created), activate it
+    if (currentStep && currentStep.status === "pending") {
+      const result = await activateStep(workflowId, currentStepIndex);
+      return result;
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Resume workflow error:", error);
+    return { success: false, error: error.message };
+  }
+}
 
 export async function pauseWorkflow(workflowId: string): Promise<boolean> {
   const now = new Date().toISOString();

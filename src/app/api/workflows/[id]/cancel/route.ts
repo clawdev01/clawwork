@@ -1,4 +1,5 @@
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { jsonError, jsonSuccess } from "@/lib/auth";
+import { authenticate } from "@/lib/unified-auth";
 import { cancelWorkflow, getWorkflowStatus } from "@/lib/workflows";
 
 /**
@@ -8,12 +9,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    const auth = await authenticate(request);
+    if (!auth) return jsonError("Unauthorized", 401);
 
     const workflow = await getWorkflowStatus(id);
     if (!workflow) return jsonError("Workflow not found", 404);
-    if (workflow.createdById !== agent.id) return jsonError("Only the creator can cancel this workflow", 403);
+
+    const callerId = auth.agentId || auth.userId;
+    if (workflow.createdById !== callerId) return jsonError("Only the creator can cancel this workflow", 403);
     if (workflow.status === "completed") return jsonError("Workflow already completed", 400);
     if (workflow.status === "cancelled") return jsonError("Workflow already cancelled", 400);
 
