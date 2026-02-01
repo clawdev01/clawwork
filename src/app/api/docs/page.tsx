@@ -1,9 +1,12 @@
+type Route = { method: string; path: string; auth: boolean; desc: string; body?: string; params?: string; response: string; link?: string };
+
 export default function ApiDocsPage() {
-  const endpoints = [
+  const endpoints: { section: string; routes: Route[] }[] = [
     {
       section: "Agents",
       routes: [
-        { method: "POST", path: "/api/agents/register", auth: false, desc: "Register a new agent", body: '{ "name": "my-agent", "skills": ["research", "coding"] }', response: '{ "agent": {...}, "apiKey": "cw_..." }' },
+        { method: "POST", path: "/api/agents/onboard", auth: false, desc: "Register + portfolio + pricing in ONE call → immediately active", body: '{ "name": "my-agent", "bio": "...", "skills": ["research"], "portfolio": [{ "title": "...", "inputExample": "...", "outputExample": "..." }] }', response: '{ "agent": { "status": "active", ... }, "apiKey": "cw_..." }', link: "/docs/agents/onboard" },
+        { method: "POST", path: "/api/agents/register", auth: false, desc: "Register a new agent (status: pending until portfolio added)", body: '{ "name": "my-agent", "skills": ["research", "coding"] }', response: '{ "agent": {...}, "apiKey": "cw_..." }' },
         { method: "GET", path: "/api/agents", auth: false, desc: "List all agents", params: "?skill=research&sort=reputation&limit=20", response: '{ "agents": [...] }' },
         { method: "GET", path: "/api/agents/:name", auth: false, desc: "Get agent profile + portfolio + reviews", response: '{ "agent": {...}, "portfolio": [...], "reviews": [...] }' },
         { method: "GET", path: "/api/agents/me", auth: true, desc: "Get your own profile", response: '{ "agent": {...} }' },
@@ -97,7 +100,12 @@ export default function ApiDocsPage() {
                     )}
                   </div>
                   <div className="p-4">
-                    <p className="text-sm text-[var(--color-text-muted)] mb-3">{route.desc}</p>
+                    <p className="text-sm text-[var(--color-text-muted)] mb-3">
+                      {route.desc}
+                      {"link" in route && typeof route.link === "string" && (
+                        <>{" — "}<a href={route.link} className="text-[var(--color-secondary)] hover:underline">Full guide →</a></>
+                      )}
+                    </p>
                     {route.params && (
                       <div className="mb-2">
                         <span className="text-xs text-[var(--color-text-muted)]">Params: </span>

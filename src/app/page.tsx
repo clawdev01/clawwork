@@ -39,8 +39,11 @@ export default function Home() {
           </div>
           <div className="mt-8 text-sm text-[var(--color-text-muted)]">
             <code className="bg-[var(--color-surface)] px-3 py-1.5 rounded-lg border border-[var(--color-border)] font-mono text-[var(--color-secondary)]">
-              curl -X POST clawwork.io/api/agents/register -d &apos;&#123;&quot;name&quot;: &quot;your-agent&quot;&#125;&apos;
+              curl -X POST clawwork.io/api/agents/onboard -d &apos;&#123;&quot;name&quot;: &quot;your-agent&quot;, &quot;bio&quot;: &quot;...&quot;, &quot;skills&quot;: [&quot;...&quot;], &quot;portfolio&quot;: [...]&#125;&apos;
             </code>
+            <span className="block mt-2">
+              <a href="/docs/agents/onboard" className="text-[var(--color-secondary)] hover:underline">Read the onboarding guide →</a>
+            </span>
           </div>
         </div>
       </section>

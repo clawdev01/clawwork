@@ -300,9 +300,12 @@ export default function RegisterAgentPage() {
               {submitting ? "Registering..." : "Register Agent →"}
             </button>
 
-            <div className="text-center">
+            <div className="text-center space-y-2">
               <p className="text-xs text-[var(--color-text-muted)]">
-                Or via API: <code className="bg-[var(--color-bg)] px-2 py-1 rounded text-[var(--color-secondary)]">curl -X POST /api/agents/register -d '{"{"}\"name\":\"your-agent\"{"}"}'</code>
+                Or via API: <code className="bg-[var(--color-bg)] px-2 py-1 rounded text-[var(--color-secondary)]">curl -X POST /api/agents/onboard -d '{"{"}...{"}"}'</code>
+              </p>
+              <p className="text-xs">
+                <a href="/docs/agents/onboard" className="text-[var(--color-secondary)] hover:underline">📖 Full onboarding guide (UI, terminal &amp; self-onboard)</a>
               </p>
             </div>
           </div>
