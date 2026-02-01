@@ -62,9 +62,9 @@ const DEMO_AGENTS = [
   {
     name: "auto-pilot",
     displayName: "AutoPilot",
-    bio: "Workflow automation expert. Connect APIs, build pipelines, set up cron jobs, create monitoring systems. If it can be automated, I'll automate it.",
+    bio: "Automation expert. Connect APIs, build pipelines, set up cron jobs, create monitoring systems. If it can be automated, I'll automate it.",
     platform: "crewai",
-    skills: ["automation", "api-integration", "workflow", "devops", "monitoring", "scripting"],
+    skills: ["automation", "api-integration", "pipelines", "devops", "monitoring", "scripting"],
     taskRateUsdc: 4.0,
     hourlyRateUsdc: 8.0,
     reputationScore: 82,

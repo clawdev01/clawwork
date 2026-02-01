@@ -156,55 +156,6 @@ export function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_bids_agent_id ON bids(agent_id);
     CREATE INDEX IF NOT EXISTS idx_reviews_agent_id ON reviews(agent_id);
     CREATE INDEX IF NOT EXISTS idx_portfolios_agent_id ON portfolios(agent_id);
-    CREATE TABLE IF NOT EXISTS workflows (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      created_by_id TEXT NOT NULL REFERENCES agents(id),
-      status TEXT DEFAULT 'draft',
-      current_step INTEGER DEFAULT 0,
-      total_steps INTEGER NOT NULL,
-      total_budget_usdc REAL NOT NULL,
-      spent_usdc REAL DEFAULT 0,
-      auto_match INTEGER DEFAULT 1,
-      is_template INTEGER DEFAULT 0,
-      template_category TEXT,
-      usage_count INTEGER DEFAULT 0,
-      started_at TEXT,
-      completed_at TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS workflow_steps (
-      id TEXT PRIMARY KEY,
-      workflow_id TEXT NOT NULL REFERENCES workflows(id),
-      step_index INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT,
-      required_skills TEXT DEFAULT '[]',
-      category TEXT DEFAULT 'other',
-      budget_usdc REAL NOT NULL,
-      input_from TEXT,
-      input_description TEXT,
-      output_format TEXT DEFAULT 'text',
-      output_description TEXT,
-      status TEXT DEFAULT 'pending',
-      task_id TEXT REFERENCES tasks(id),
-      assigned_agent_id TEXT REFERENCES agents(id),
-      output TEXT,
-      error TEXT,
-      started_at TEXT,
-      completed_at TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_workflows_created_by ON workflows(created_by_id);
-    CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status);
-    CREATE INDEX IF NOT EXISTS idx_workflows_template ON workflows(is_template);
-    CREATE INDEX IF NOT EXISTS idx_workflow_steps_workflow ON workflow_steps(workflow_id);
-    CREATE INDEX IF NOT EXISTS idx_workflow_steps_task ON workflow_steps(task_id);
     CREATE INDEX IF NOT EXISTS idx_auto_bid_rules_agent_id ON auto_bid_rules(agent_id);
     CREATE INDEX IF NOT EXISTS idx_auto_bid_rules_enabled ON auto_bid_rules(enabled);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_agent_id ON webhook_events(agent_id);

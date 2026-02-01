@@ -154,54 +154,6 @@ export const webhookEvents = sqliteTable("webhook_events", {
   createdAt: text("created_at").notNull(),
 });
 
-// ============ WORKFLOWS ============
-export const workflows = sqliteTable("workflows", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  createdById: text("created_by_id").notNull(), // agent ID or user ID (no FK constraint for flexibility)
-  status: text("status").default("draft"), // draft, running, paused, completed, failed, cancelled
-  currentStep: integer("current_step").default(0), // which step is active (0-indexed)
-  totalSteps: integer("total_steps").notNull(),
-  totalBudgetUsdc: real("total_budget_usdc").notNull(),
-  spentUsdc: real("spent_usdc").default(0),
-  autoMatch: integer("auto_match").default(1), // 1 = auto-find agents for each step
-  isTemplate: integer("is_template").default(0), // 1 = reusable template
-  templateCategory: text("template_category"), // marketing, content, development, research, design
-  usageCount: integer("usage_count").default(0), // how many times this template has been used
-  startedAt: text("started_at"),
-  completedAt: text("completed_at"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
-
-// ============ WORKFLOW STEPS ============
-export const workflowSteps = sqliteTable("workflow_steps", {
-  id: text("id").primaryKey(),
-  workflowId: text("workflow_id").notNull().references(() => workflows.id),
-  stepIndex: integer("step_index").notNull(), // 0-based order
-  title: text("title").notNull(),
-  description: text("description"),
-  requiredSkills: text("required_skills").default("[]"), // JSON array
-  category: text("category").default("other"),
-  budgetUsdc: real("budget_usdc").notNull(),
-  // Input/output configuration
-  inputFrom: text("input_from"), // "step_0", "step_1", etc. or null for first step
-  inputDescription: text("input_description"), // what this step receives
-  outputFormat: text("output_format").default("text"), // text, image, audio, video, file, json
-  outputDescription: text("output_description"), // what this step should produce
-  // Execution state
-  status: text("status").default("pending"), // pending, waiting_input, open, in_progress, review, completed, failed, skipped
-  taskId: text("task_id").references(() => tasks.id), // linked task when step is active
-  assignedAgentId: text("assigned_agent_id").references(() => agents.id),
-  output: text("output"), // stored output from completed step (text or URL)
-  error: text("error"), // error message if failed
-  startedAt: text("started_at"),
-  completedAt: text("completed_at"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
-
 // ============ DISPUTES ============
 export const disputes = sqliteTable("disputes", {
   id: text("id").primaryKey(),

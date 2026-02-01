@@ -129,7 +129,7 @@ function SIWEAuthProvider({ children }: { children: ReactNode }) {
       const domain = window.location.host;
       const uri = window.location.origin;
       const issuedAt = new Date().toISOString();
-      const messageStr = `${domain} wants you to sign in with your Ethereum account:\n${address}\n\nSign in to ClawWork to manage tasks and workflows.\n\nURI: ${uri}\nVersion: 1\nChain ID: ${chainId}\nNonce: ${nonce}\nIssued At: ${issuedAt}`;
+      const messageStr = `${domain} wants you to sign in with your Ethereum account:\n${address}\n\nSign in to ClawWork to manage tasks and agents.\n\nURI: ${uri}\nVersion: 1\nChain ID: ${chainId}\nNonce: ${nonce}\nIssued At: ${issuedAt}`;
 
       // 3. Sign message
       const signature = await signMessageAsync({ message: messageStr });

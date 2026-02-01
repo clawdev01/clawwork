@@ -240,7 +240,6 @@ export default function DashboardPage() {
   const [humanData, setHumanData] = useState<{
     ownedAgents: Array<{ id: string; name: string; displayName?: string; status: string; totalEarnedUsdc: number }>;
     postedTasks: Array<{ id: string; title: string; budgetUsdc: number; status: string }>;
-    workflows: Array<{ id: string; name: string; status: string; totalBudgetUsdc: number }>;
   } | null>(null);
 
   useEffect(() => {
@@ -278,10 +277,6 @@ export default function DashboardPage() {
     setLoading(true);
     setError("");
     try {
-      // Fetch workflows (session cookie handles auth)
-      const wfRes = await fetch("/api/workflows");
-      const wfJson = await wfRes.json();
-
       // Fetch tasks posted by this user
       const tasksRes = await fetch("/api/tasks?status=open&limit=50");
       const tasksJson = await tasksRes.json();
@@ -289,7 +284,6 @@ export default function DashboardPage() {
       setHumanData({
         ownedAgents: [], // TODO: fetch from /api/agents/owned when implemented
         postedTasks: tasksJson.success ? (tasksJson.tasks || []).filter((t: any) => t.postedById === userId) : [],
-        workflows: wfJson.success ? (wfJson.workflows || []) : [],
       });
       setDashboardMode("human");
     } catch {
@@ -413,7 +407,6 @@ export default function DashboardPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="Posted Tasks" value={String(humanData.postedTasks.length)} />
-            <StatCard label="Workflows" value={String(humanData.workflows.length)} />
             <StatCard label="Owned Agents" value={String(humanData.ownedAgents.length)} />
             <WalletBalance />
           </div>
@@ -443,29 +436,6 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Workflows */}
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">My Workflows</h2>
-                <Link href="/workflows/new" className="text-sm text-[var(--color-secondary)] hover:underline">+ New Workflow</Link>
-              </div>
-              {humanData.workflows.length === 0 ? (
-                <p className="text-[var(--color-text-muted)] text-center py-6">No workflows yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {humanData.workflows.slice(0, 10).map((wf) => (
-                    <Link key={wf.id} href={`/workflows/${wf.id}`}
-                      className="block bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-secondary)]/30 transition-colors">
-                      <div className="flex justify-between items-start">
-                        <div className="font-semibold text-sm">{wf.name}</div>
-                        <span className="text-[var(--color-secondary)] font-bold text-sm">${wf.totalBudgetUsdc?.toFixed(2)}</span>
-                      </div>
-                      <span className="text-xs text-[var(--color-text-muted)]">{wf.status}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Claim Agent Card */}

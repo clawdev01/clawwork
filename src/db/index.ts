@@ -11,7 +11,6 @@ const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), "clawwork.db");
 const sqlite = new Database(DB_PATH);
 sqlite.pragma("journal_mode = WAL");
 // FK enforcement disabled — integrity managed at application level
-// (workflows.created_by_id can reference users or agents)
 sqlite.pragma("foreign_keys = OFF");
 
 // Auto-migrate: create missing tables and add columns
@@ -55,26 +54,6 @@ const autoMigrate = () => {
       action TEXT NOT NULL, reason TEXT NOT NULL, severity TEXT NOT NULL,
       metadata TEXT, created_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS workflows (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,
-      created_by_id TEXT NOT NULL,
-      status TEXT DEFAULT 'draft', current_step INTEGER DEFAULT 0,
-      total_steps INTEGER NOT NULL, total_budget_usdc REAL NOT NULL,
-      spent_usdc REAL DEFAULT 0, auto_match INTEGER DEFAULT 1,
-      is_template INTEGER DEFAULT 0, template_category TEXT,
-      usage_count INTEGER DEFAULT 0, started_at TEXT, completed_at TEXT,
-      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS workflow_steps (
-      id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL REFERENCES workflows(id),
-      step_index INTEGER NOT NULL, title TEXT NOT NULL, description TEXT,
-      required_skills TEXT DEFAULT '[]', category TEXT DEFAULT 'other',
-      budget_usdc REAL NOT NULL, input_from TEXT, input_description TEXT,
-      output_format TEXT DEFAULT 'text', output_description TEXT,
-      status TEXT DEFAULT 'pending', task_id TEXT REFERENCES tasks(id),
-      assigned_agent_id TEXT REFERENCES agents(id), output TEXT, error TEXT,
-      started_at TEXT, completed_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-    );
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES agents(id),
       type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL,
@@ -100,8 +79,6 @@ const autoMigrate = () => {
     CREATE INDEX IF NOT EXISTS idx_trust_scores_wallet ON trust_scores(wallet_address);
     CREATE INDEX IF NOT EXISTS idx_trust_scores_wallet_role ON trust_scores(wallet_address, role);
     CREATE INDEX IF NOT EXISTS idx_abuse_log_wallet ON abuse_log(wallet_address);
-    CREATE INDEX IF NOT EXISTS idx_workflows_created_by ON workflows(created_by_id);
-    CREATE INDEX IF NOT EXISTS idx_workflow_steps_workflow ON workflow_steps(workflow_id);
     CREATE INDEX IF NOT EXISTS idx_notifications_agent_id ON notifications(agent_id);
     CREATE INDEX IF NOT EXISTS idx_auto_bid_rules_agent_id ON auto_bid_rules(agent_id);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_agent_id ON webhook_events(agent_id);

@@ -4,7 +4,6 @@ import { calculateFees } from "@/lib/crypto";
 import { releaseEscrow } from "@/lib/payments";
 import { notifyPaymentReceived } from "@/lib/matching";
 import { sendPaymentReceivedEmail } from "@/lib/email";
-import { completeWorkflowStep } from "@/lib/workflows";
 import { updateTrustScore } from "@/lib/trust-score";
 import { checkDrainComplete } from "@/lib/drain";
 import { eq } from "drizzle-orm";
@@ -13,9 +12,6 @@ import { eq } from "drizzle-orm";
  * POST /api/tasks/:id/approve
  * 
  * Poster approves completed work → triggers USDC payment to agent.
- * If task is part of a workflow, advances to the next step automatically.
- * 
- * Optional body: { output: "..." } — step output for workflow chaining
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -24,7 +20,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const agent = await authenticateAgent(request);
     if (!agent) return jsonError("Unauthorized", 401);
 
-    // Parse body (optional — may contain workflow output)
     const body = await request.json().catch(() => ({}));
 
     const task = await db.query.tasks.findFirst({
@@ -93,19 +88,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
     }
 
-    // 🔗 WORKFLOW ADVANCEMENT — if this task is part of a workflow, advance to next step
-    let workflowInfo: Record<string, unknown> | undefined;
-    const stepOutput = body.output || body.workflowOutput || "Task completed successfully.";
-    const workflowResult = await completeWorkflowStep(id, stepOutput);
-    
-    if (workflowResult.advanced || workflowResult.workflowCompleted) {
-      workflowInfo = {
-        advanced: workflowResult.advanced,
-        workflowCompleted: workflowResult.workflowCompleted,
-        nextTaskId: workflowResult.nextTaskId,
-      };
-    }
-
     // 📊 UPDATE TRUST SCORES
     if (assignedAgent.walletAddress) {
       updateTrustScore(assignedAgent.walletAddress, "agent", {
@@ -146,7 +128,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         gasPaidByPlatform: true,
         error: paymentResult.error,
       },
-      ...(workflowInfo ? { workflow: workflowInfo } : {}),
       ...(drainFlipped ? { agentStatus: "inactive", agentDrainComplete: true } : {}),
     });
 

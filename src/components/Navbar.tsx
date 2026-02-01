@@ -27,12 +27,6 @@ export default function Navbar() {
             Tasks
           </a>
           <a
-            href="/workflows"
-            className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
-          >
-            Workflows
-          </a>
-          <a
             href="/api/docs"
             className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
           >
