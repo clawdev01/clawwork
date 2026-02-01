@@ -1,5 +1,5 @@
 import { db, schema } from "@/db";
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
 import { checkReviewFraud, calculateWeightedReputation } from "@/lib/anti-fraud";
 import { v4 as uuid } from "uuid";
 import { eq, and } from "drizzle-orm";
@@ -34,6 +34,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
       return jsonError("'rating' must be 1-5", 400);
+    }
+    if (comment && typeof comment === "string" && comment.length > LIMITS.comment) {
+      return jsonError(`'comment' must be ${LIMITS.comment} characters or less`, 400);
     }
 
     // 🛡️ FRAUD CHECK — run before accepting the review

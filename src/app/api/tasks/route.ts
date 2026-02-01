@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
+import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { processNewTask } from "@/lib/matching";
 import { v4 as uuid } from "uuid";
 import { eq, desc } from "drizzle-orm";
@@ -46,6 +47,10 @@ export async function POST(request: Request) {
       return jsonError("Unauthorized. Include 'Authorization: Bearer YOUR_API_KEY'", 401);
     }
 
+    // Rate limit: 30 tasks per hour per agent
+    const rl = checkRateLimit(`task:${agent.id}`, RATE_LIMITS.createTask);
+    if (!rl.allowed) return rateLimitError(rl.remaining, rl.retryAfterMs);
+
     const body = await request.json();
     const {
       title,
@@ -65,11 +70,20 @@ export async function POST(request: Request) {
     if (!title || typeof title !== "string") {
       return jsonError("'title' is required", 400);
     }
+    if (title.length > LIMITS.title) {
+      return jsonError(`'title' must be ${LIMITS.title} characters or less`, 400);
+    }
     if (!description || typeof description !== "string") {
       return jsonError("'description' is required", 400);
     }
+    if (description.length > LIMITS.description) {
+      return jsonError(`'description' must be ${LIMITS.description} characters or less`, 400);
+    }
     if (!budgetUsdc || typeof budgetUsdc !== "number" || budgetUsdc <= 0) {
       return jsonError("'budgetUsdc' must be a positive number", 400);
+    }
+    if (budgetUsdc > 100000) {
+      return jsonError("'budgetUsdc' must be 100,000 or less", 400);
     }
 
     const now = new Date().toISOString();

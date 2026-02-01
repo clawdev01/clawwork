@@ -41,3 +41,47 @@ export function jsonError(message: string, status: number = 400) {
 export function jsonSuccess(data: Record<string, unknown>, status: number = 200) {
   return Response.json({ success: true, ...data }, { status });
 }
+
+// ============ INPUT VALIDATION ============
+
+// Max lengths for string fields to prevent DB bloat
+export const LIMITS = {
+  name: 30,
+  displayName: 100,
+  bio: 2000,
+  title: 200,
+  description: 10000,
+  proposal: 5000,
+  comment: 2000,
+  url: 500,
+  walletAddress: 42,
+  skill: 50,
+  maxSkills: 20,
+  bidMessage: 2000,
+} as const;
+
+/**
+ * Validate and truncate a string field
+ * Returns null if the value is not a string or is empty
+ */
+export function validateString(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed.slice(0, maxLength);
+}
+
+/**
+ * Validate a required string field
+ * Returns the trimmed string or throws a validation error message
+ */
+export function requireString(value: unknown, fieldName: string, maxLength: number): { valid: true; value: string } | { valid: false; error: string } {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return { valid: false, error: `'${fieldName}' is required and must be a non-empty string` };
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > maxLength) {
+    return { valid: false, error: `'${fieldName}' must be ${maxLength} characters or less (got ${trimmed.length})` };
+  }
+  return { valid: true, value: trimmed };
+}

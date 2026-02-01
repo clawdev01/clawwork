@@ -1,10 +1,16 @@
 import { db, schema } from "@/db";
-import { generateApiKey, jsonError, jsonSuccess } from "@/lib/auth";
+import { generateApiKey, jsonError, jsonSuccess, LIMITS, validateString } from "@/lib/auth";
+import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { v4 as uuid } from "uuid";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 5 registrations per hour per IP
+    const clientId = getClientId(request);
+    const rl = checkRateLimit(`register:${clientId}`, RATE_LIMITS.register);
+    if (!rl.allowed) return rateLimitError(rl.remaining, rl.retryAfterMs);
+
     const body = await request.json();
     const { name, displayName, bio, platform, walletAddress, skills } = body;
 
@@ -34,11 +40,25 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const id = uuid();
 
+    // Validate string lengths
+    if (displayName && typeof displayName === "string" && displayName.length > LIMITS.displayName) {
+      return jsonError(`'displayName' must be ${LIMITS.displayName} characters or less`, 400);
+    }
+    if (bio && typeof bio === "string" && bio.length > LIMITS.bio) {
+      return jsonError(`'bio' must be ${LIMITS.bio} characters or less`, 400);
+    }
+    if (walletAddress && typeof walletAddress === "string" && walletAddress.length > LIMITS.walletAddress) {
+      return jsonError(`'walletAddress' must be ${LIMITS.walletAddress} characters or less`, 400);
+    }
+
     // Validate skills
     let parsedSkills: string[] = [];
     if (skills) {
       if (Array.isArray(skills)) {
-        parsedSkills = skills.filter((s: unknown) => typeof s === "string");
+        parsedSkills = skills
+          .filter((s: unknown) => typeof s === "string")
+          .slice(0, LIMITS.maxSkills)
+          .map((s: string) => s.slice(0, LIMITS.skill));
       } else {
         return jsonError("'skills' must be an array of strings", 400);
       }

@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
+import { checkRateLimit, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { v4 as uuid } from "uuid";
 import { eq, and } from "drizzle-orm";
 
@@ -63,6 +64,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return jsonError("Task is not open for bids", 400);
     }
 
+    // Rate limit: 60 bids per hour per agent
+    const rl = checkRateLimit(`bid:${agent.id}`, RATE_LIMITS.submitBid);
+    if (!rl.allowed) return rateLimitError(rl.remaining, rl.retryAfterMs);
+
     // Can't bid on your own task
     if (task.postedById === agent.id) {
       return jsonError("You cannot bid on your own task", 400);
@@ -87,6 +92,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (!proposal || typeof proposal !== "string" || proposal.length < 10) {
       return jsonError("'proposal' is required (min 10 characters)", 400);
+    }
+    if (proposal.length > LIMITS.proposal) {
+      return jsonError(`'proposal' must be ${LIMITS.proposal} characters or less`, 400);
     }
 
     const now = new Date().toISOString();
