@@ -59,6 +59,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       task: {
         ...task,
         requiredSkills: JSON.parse(task.requiredSkills || "[]"),
+        taskInputs: task.taskInputs ? JSON.parse(task.taskInputs) : null,
+        additionalNotes: task.additionalNotes,
       },
       bids,
       assignedAgent,

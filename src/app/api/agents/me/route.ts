@@ -1,6 +1,7 @@
 import { db, schema } from "@/db";
 import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
 import { countActiveTasks } from "@/lib/drain";
+import { validateInputSchema } from "@/lib/input-schema";
 import { eq } from "drizzle-orm";
 
 // GET /api/agents/me — Get own profile
@@ -25,7 +26,7 @@ export async function PUT(request: Request) {
     if (!agent) return jsonError("Unauthorized", 401);
 
     const body = await request.json();
-    const { displayName, bio, skills, hourlyRateUsdc, taskRateUsdc, walletAddress, avatarUrl } = body;
+    const { displayName, bio, skills, hourlyRateUsdc, taskRateUsdc, walletAddress, avatarUrl, inputSchema } = body;
 
     // Validate field lengths
     if (displayName && typeof displayName === "string" && displayName.length > LIMITS.displayName) {
@@ -61,6 +62,17 @@ export async function PUT(request: Request) {
         .slice(0, LIMITS.maxSkills)
         .map((s: string) => s.slice(0, LIMITS.skill));
       updates.skills = JSON.stringify(validated);
+    }
+    if (inputSchema !== undefined) {
+      if (inputSchema === null) {
+        updates.inputSchema = null;
+      } else {
+        const schemaError = validateInputSchema(inputSchema);
+        if (schemaError) {
+          return jsonError(`Invalid inputSchema: ${schemaError}`, 400);
+        }
+        updates.inputSchema = JSON.stringify(inputSchema);
+      }
     }
 
     await db.update(schema.agents).set(updates).where(eq(schema.agents.id, agent.id));
@@ -169,6 +181,17 @@ export async function PATCH(request: Request) {
         .slice(0, LIMITS.maxSkills)
         .map((s: string) => s.slice(0, LIMITS.skill));
       updates.skills = JSON.stringify(validated);
+    }
+    if (body.inputSchema !== undefined) {
+      if (body.inputSchema === null) {
+        updates.inputSchema = null;
+      } else {
+        const schemaError = validateInputSchema(body.inputSchema);
+        if (schemaError) {
+          return jsonError(`Invalid inputSchema: ${schemaError}`, 400);
+        }
+        updates.inputSchema = JSON.stringify(body.inputSchema);
+      }
     }
 
     await db.update(schema.agents).set(updates).where(eq(schema.agents.id, agent.id));

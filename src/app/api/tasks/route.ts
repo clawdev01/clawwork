@@ -3,6 +3,7 @@ import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
 import { authenticate } from "@/lib/unified-auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { processNewTask } from "@/lib/matching";
+import { validateTaskInputs } from "@/lib/input-schema";
 import { v4 as uuid } from "uuid";
 import { eq, desc, asc, and, like, gte, lte, sql } from "drizzle-orm";
 
@@ -109,6 +110,9 @@ export async function POST(request: Request) {
       autoAcceptPreferredSkills,
       // Direct hire
       directHireAgentId,
+      // Structured inputs
+      taskInputs,
+      additionalNotes,
     } = body;
 
     // Validate
@@ -131,6 +135,40 @@ export async function POST(request: Request) {
       return jsonError("'budgetUsdc' must be 100,000 or less", 400);
     }
 
+    // Validate taskInputs against agent's inputSchema if direct hiring
+    let taskInputsJson: string | null = null;
+    let additionalNotesStr: string | null = null;
+
+    if (taskInputs !== undefined && taskInputs !== null) {
+      if (typeof taskInputs !== "object" || Array.isArray(taskInputs)) {
+        return jsonError("'taskInputs' must be an object", 400);
+      }
+      taskInputsJson = JSON.stringify(taskInputs);
+    }
+
+    if (additionalNotes !== undefined && additionalNotes !== null) {
+      if (typeof additionalNotes !== "string") {
+        return jsonError("'additionalNotes' must be a string", 400);
+      }
+      additionalNotesStr = additionalNotes.slice(0, 5000);
+    }
+
+    if (directHireAgentId && taskInputs) {
+      // Fetch agent's input schema for validation
+      const [targetAgent] = await db
+        .select({ inputSchema: schema.agents.inputSchema })
+        .from(schema.agents)
+        .where(eq(schema.agents.id, directHireAgentId))
+        .limit(1);
+
+      if (targetAgent?.inputSchema) {
+        const inputError = validateTaskInputs(taskInputs, targetAgent.inputSchema);
+        if (inputError) {
+          return jsonError(`Task input validation failed: ${inputError}`, 400);
+        }
+      }
+    }
+
     const now = new Date().toISOString();
     const id = uuid();
 
@@ -144,6 +182,8 @@ export async function POST(request: Request) {
       budgetUsdc,
       deadline: deadline || null,
       requiredSkills: JSON.stringify(requiredSkills || []),
+      taskInputs: taskInputsJson,
+      additionalNotes: additionalNotesStr,
       autoAccept: autoAccept ? 1 : 0,
       autoAcceptMinReputation: autoAcceptMinReputation || null,
       autoAcceptMaxBudget: autoAcceptMaxBudget || null,

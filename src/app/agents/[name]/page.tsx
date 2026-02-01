@@ -2,6 +2,8 @@ import { db, schema } from "@/db";
 import { eq, and, count } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { parseInputSchema } from "@/lib/input-schema";
+import type { InputField } from "@/lib/input-schema";
 
 interface PageProps {
   params: Promise<{ name: string }>;
@@ -88,6 +90,7 @@ export default async function AgentProfilePage({ params }: PageProps) {
   const skills = JSON.parse(agent.skills || "[]") as string[];
   const specializations = skills.slice(0, 3);
   const averageRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
+  const inputSchema = parseInputSchema(agent.inputSchema);
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
@@ -176,6 +179,113 @@ export default async function AgentProfilePage({ params }: PageProps) {
                 </div>
               </div>
             </div>
+
+            {/* What I Need — Input Schema */}
+            {inputSchema && inputSchema.fields.length > 0 && (
+              <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
+                <h2 className="text-2xl font-bold mb-2">What I Need</h2>
+                <p className="text-[var(--color-text-muted)] text-sm mb-6">
+                  Provide the following when creating a task for this agent
+                </p>
+                <div className="space-y-4">
+                  {inputSchema.fields.map((field: InputField) => (
+                    <div
+                      key={field.name}
+                      className="border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-secondary)]/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm">
+                          {field.type === "text" ? "📝" :
+                           field.type === "textarea" ? "📄" :
+                           field.type === "number" ? "🔢" :
+                           field.type === "select" ? "📋" :
+                           field.type === "file" ? "📎" :
+                           field.type === "url" ? "🔗" :
+                           field.type === "boolean" ? "☑️" : "📝"}
+                        </span>
+                        <h3 className="font-semibold text-sm">{field.label}</h3>
+                        {field.required ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/30 font-medium">
+                            Required
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] border border-[var(--color-border)]">
+                            Optional
+                          </span>
+                        )}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] border border-[var(--color-border)]">
+                          {field.type}
+                        </span>
+                      </div>
+                      {field.description && (
+                        <p className="text-[var(--color-text-muted)] text-xs mt-1 mb-2">
+                          {field.description}
+                        </p>
+                      )}
+                      {field.type === "select" && field.options && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {field.options.map((opt) => (
+                            <span
+                              key={opt}
+                              className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                                opt === field.default
+                                  ? "bg-[var(--color-secondary)]/15 text-[var(--color-secondary)] border-[var(--color-secondary)]/30"
+                                  : "bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] border-[var(--color-border)]"
+                              }`}
+                            >
+                              {opt}{opt === field.default ? " (default)" : ""}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {field.placeholder && (
+                        <p className="text-[var(--color-text-muted)] text-[11px] mt-1.5 italic">
+                          e.g. {field.placeholder}
+                        </p>
+                      )}
+                      {field.validation && (
+                        <div className="flex gap-2 mt-1.5">
+                          {field.validation.minLength !== undefined && (
+                            <span className="text-[10px] text-[var(--color-text-muted)]">
+                              Min: {field.validation.minLength} chars
+                            </span>
+                          )}
+                          {field.validation.maxLength !== undefined && (
+                            <span className="text-[10px] text-[var(--color-text-muted)]">
+                              Max: {field.validation.maxLength} chars
+                            </span>
+                          )}
+                          {field.validation.min !== undefined && (
+                            <span className="text-[10px] text-[var(--color-text-muted)]">
+                              Min: {field.validation.min}
+                            </span>
+                          )}
+                          {field.validation.max !== undefined && (
+                            <span className="text-[10px] text-[var(--color-text-muted)]">
+                              Max: {field.validation.max}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {inputSchema.additionalNotes && (
+                    <div className="border border-dashed border-[var(--color-border)] rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm">💬</span>
+                        <h3 className="font-semibold text-sm">Additional Notes</h3>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] border border-[var(--color-border)]">
+                          Optional
+                        </span>
+                      </div>
+                      <p className="text-[var(--color-text-muted)] text-xs">
+                        Free-form field for any extra context or special instructions
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Portfolio */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">

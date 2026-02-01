@@ -34,6 +34,7 @@ export const agents = sqliteTable("agents", {
   webhookSecret: text("webhook_secret"), // HMAC secret for webhook verification
   maxConcurrentTasks: integer("max_concurrent_tasks").default(5), // capacity limit
   availabilitySchedule: text("availability_schedule"), // JSON: { type: "always"|"scheduled"|"manual", schedule?: { days, startHour, endHour, timezone } }
+  inputSchema: text("input_schema"), // JSON — structured input definition (see InputSchema type)
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -65,6 +66,8 @@ export const tasks = sqliteTable("tasks", {
   requiredSkills: text("required_skills").default("[]"), // JSON array
   status: text("status").default("open"), // open, in_progress, review, completed, cancelled, disputed
   assignedAgentId: text("assigned_agent_id").references(() => agents.id),
+  taskInputs: text("task_inputs"), // JSON — filled-in values matching agent's inputSchema
+  additionalNotes: text("additional_notes"), // free-form extra context from employer
   escrowTxHash: text("escrow_tx_hash"),
   completionTxHash: text("completion_tx_hash"),
   bidCount: integer("bid_count").default(0),

@@ -30,6 +30,24 @@ interface PortfolioItem {
   outputExample?: string | null;
 }
 
+interface InputSchemaField {
+  name: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "select" | "file" | "url" | "boolean";
+  required?: boolean;
+  placeholder?: string;
+  description?: string;
+  options?: string[];
+  default?: string | number | boolean;
+  accept?: string;
+  validation?: { minLength?: number; maxLength?: number; min?: number; max?: number };
+}
+
+interface InputSchema {
+  fields: InputSchemaField[];
+  additionalNotes?: boolean;
+}
+
 function NewTaskForm() {
   const searchParams = useSearchParams();
   const agentParam = searchParams.get("agent");
@@ -64,6 +82,11 @@ function NewTaskForm() {
   // Portfolio data for the selected agent
   const [selectedAgentPortfolio, setSelectedAgentPortfolio] = useState<PortfolioItem[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
+
+  // Input schema & dynamic form
+  const [agentInputSchema, setAgentInputSchema] = useState<InputSchema | null>(null);
+  const [taskInputValues, setTaskInputValues] = useState<Record<string, unknown>>({});
+  const [taskAdditionalNotes, setTaskAdditionalNotes] = useState("");
 
   const deadlineOptions: { value: DeadlineOption; label: string; icon: string }[] = [
     { value: "asap", label: "ASAP", icon: "⚡" },
@@ -101,18 +124,35 @@ function NewTaskForm() {
       .finally(() => setPreselectedAgentLoading(false));
   }, [agentParam]);
 
-  // Fetch full portfolio when an agent is selected
+  // Fetch full portfolio + inputSchema when an agent is selected
   const fetchPortfolio = useCallback(async (agentName: string) => {
     setPortfolioLoading(true);
     setSelectedAgentPortfolio([]);
+    setAgentInputSchema(null);
+    setTaskInputValues({});
+    setTaskAdditionalNotes("");
     try {
       const res = await fetch(`/api/agents/${agentName}`);
       const data = await res.json();
-      if (data.success && data.agent?.portfolio) {
-        setSelectedAgentPortfolio(data.agent.portfolio);
+      if (data.success) {
+        if (data.portfolio) {
+          setSelectedAgentPortfolio(data.portfolio);
+        }
+        if (data.agent?.inputSchema) {
+          const schema = data.agent.inputSchema as InputSchema;
+          setAgentInputSchema(schema);
+          // Initialize defaults
+          const defaults: Record<string, unknown> = {};
+          for (const field of schema.fields) {
+            if (field.default !== undefined) {
+              defaults[field.name] = field.default;
+            }
+          }
+          setTaskInputValues(defaults);
+        }
       }
     } catch {
-      // silently fail — portfolio is a nice-to-have
+      // silently fail
     } finally {
       setPortfolioLoading(false);
     }
@@ -123,6 +163,9 @@ function NewTaskForm() {
       fetchPortfolio(selectedAgent.name);
     } else {
       setSelectedAgentPortfolio([]);
+      setAgentInputSchema(null);
+      setTaskInputValues({});
+      setTaskAdditionalNotes("");
     }
   }, [selectedAgent, fetchPortfolio]);
 
@@ -282,6 +325,14 @@ function NewTaskForm() {
         payload.directHireAgentId = selectedAgent.id;
       }
       // open-bids: autoAccept defaults to false
+
+      // Structured inputs from agent's input schema
+      if (agentInputSchema && Object.keys(taskInputValues).length > 0) {
+        payload.taskInputs = taskInputValues;
+      }
+      if (taskAdditionalNotes.trim()) {
+        payload.additionalNotes = taskAdditionalNotes.trim();
+      }
 
       const res = await fetch("/api/tasks", {
         method: "POST",
@@ -561,6 +612,138 @@ function NewTaskForm() {
                         This agent hasn&apos;t added portfolio items yet
                       </p>
                     ) : null}
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ Structured Input Fields (from agent's inputSchema) ═══ */}
+              {selectedAgent && agentInputSchema && agentInputSchema.fields.length > 0 && (
+                <div className="border border-[var(--color-primary)]/30 rounded-xl overflow-hidden" style={{ borderLeftWidth: "3px" }}>
+                  <div className="px-5 py-4 bg-[var(--color-primary)]/5">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      📋 {agentDisplayName}&apos;s Required Info
+                      <span className="text-xs font-normal text-[var(--color-text-muted)]">
+                        — fill in the fields below
+                      </span>
+                    </h3>
+                  </div>
+                  <div className="px-5 py-4 space-y-4">
+                    {agentInputSchema.fields.map((field) => (
+                      <div key={field.name}>
+                        <label className="block text-sm font-medium mb-1.5">
+                          {field.label}
+                          {field.required && <span className="text-[var(--color-primary)] ml-1">*</span>}
+                        </label>
+                        {field.description && (
+                          <p className="text-xs text-[var(--color-text-muted)] mb-2">{field.description}</p>
+                        )}
+
+                        {field.type === "text" && (
+                          <input
+                            type="text"
+                            value={(taskInputValues[field.name] as string) || ""}
+                            onChange={(e) => setTaskInputValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                            className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                            placeholder={field.placeholder || ""}
+                            required={field.required}
+                          />
+                        )}
+
+                        {field.type === "textarea" && (
+                          <textarea
+                            value={(taskInputValues[field.name] as string) || ""}
+                            onChange={(e) => setTaskInputValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                            rows={4}
+                            className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                            placeholder={field.placeholder || ""}
+                            required={field.required}
+                          />
+                        )}
+
+                        {field.type === "number" && (
+                          <input
+                            type="number"
+                            value={(taskInputValues[field.name] as number) ?? ""}
+                            onChange={(e) => setTaskInputValues((prev) => ({ ...prev, [field.name]: e.target.value ? parseFloat(e.target.value) : "" }))}
+                            className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                            placeholder={field.placeholder || ""}
+                            min={field.validation?.min}
+                            max={field.validation?.max}
+                            required={field.required}
+                          />
+                        )}
+
+                        {field.type === "select" && field.options && (
+                          <select
+                            value={(taskInputValues[field.name] as string) || (field.default as string) || ""}
+                            onChange={(e) => setTaskInputValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                            className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                            required={field.required}
+                          >
+                            <option value="">Select...</option>
+                            {field.options.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        )}
+
+                        {field.type === "url" && (
+                          <input
+                            type="url"
+                            value={(taskInputValues[field.name] as string) || ""}
+                            onChange={(e) => setTaskInputValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                            className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                            placeholder={field.placeholder || "https://..."}
+                            required={field.required}
+                          />
+                        )}
+
+                        {field.type === "file" && (
+                          <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-4 text-center text-sm text-[var(--color-text-muted)]">
+                            <span className="text-lg">📎</span>
+                            <p className="mt-1">File upload — paste a URL or describe the file</p>
+                            {field.accept && <p className="text-xs mt-1">Accepted: {field.accept}</p>}
+                            <input
+                              type="text"
+                              value={(taskInputValues[field.name] as string) || ""}
+                              onChange={(e) => setTaskInputValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                              className="w-full mt-2 bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                              placeholder="Paste file URL or reference..."
+                            />
+                          </div>
+                        )}
+
+                        {field.type === "boolean" && (
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!!taskInputValues[field.name]}
+                              onChange={(e) => setTaskInputValues((prev) => ({ ...prev, [field.name]: e.target.checked }))}
+                              className="w-4 h-4 accent-[var(--color-primary)]"
+                            />
+                            <span className="text-sm text-[var(--color-text-muted)]">
+                              {field.placeholder || field.label}
+                            </span>
+                          </label>
+                        )}
+                      </div>
+                    ))}
+
+                    {agentInputSchema.additionalNotes && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1.5">
+                          Additional Notes
+                          <span className="text-xs font-normal text-[var(--color-text-muted)] ml-2">Optional</span>
+                        </label>
+                        <textarea
+                          value={taskAdditionalNotes}
+                          onChange={(e) => setTaskAdditionalNotes(e.target.value)}
+                          rows={3}
+                          className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                          placeholder="Any extra context or special instructions..."
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

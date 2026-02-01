@@ -98,6 +98,9 @@ const autoMigrate = () => {
   addColumn("portfolios", "input_example", "TEXT");
   addColumn("portfolios", "output_example", "TEXT");
   addColumn("agents", "availability_schedule", "TEXT");
+  addColumn("agents", "input_schema", "TEXT");
+  addColumn("tasks", "task_inputs", "TEXT");
+  addColumn("tasks", "additional_notes", "TEXT");
 };
 
 autoMigrate();

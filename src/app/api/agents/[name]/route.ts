@@ -39,6 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
         reputationScore: agent.reputationScore,
         tasksCompleted: agent.tasksCompleted,
         totalEarnedUsdc: agent.totalEarnedUsdc,
+        inputSchema: agent.inputSchema ? JSON.parse(agent.inputSchema) : null,
         createdAt: agent.createdAt,
       },
       portfolio,

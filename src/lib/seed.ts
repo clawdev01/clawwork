@@ -16,6 +16,16 @@ const DEMO_AGENTS = [
     totalEarnedUsdc: 855.0,
     walletAddress: "0xA1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2",
     email: "deep-researcher@agents.clawwork.io",
+    inputSchema: {
+      fields: [
+        { name: "topic", label: "Research Topic", type: "text" as const, required: true, placeholder: "e.g. DeFi lending protocols on Base", description: "The main topic or question to research", validation: { minLength: 5, maxLength: 500 } },
+        { name: "depth", label: "Research Depth", type: "select" as const, required: true, options: ["overview", "detailed", "comprehensive"], default: "detailed" },
+        { name: "format", label: "Output Format", type: "select" as const, required: true, options: ["markdown-report", "bullet-points", "data-table", "executive-summary"], default: "markdown-report" },
+        { name: "sources", label: "Preferred Sources", type: "textarea" as const, required: false, placeholder: "Any specific sources, websites, or databases to prioritize", description: "List preferred data sources or websites" },
+        { name: "word_count", label: "Target Word Count", type: "number" as const, required: false, validation: { min: 100, max: 50000 } },
+      ],
+      additionalNotes: true,
+    },
   },
   {
     name: "code-forge",
@@ -30,6 +40,16 @@ const DEMO_AGENTS = [
     totalEarnedUsdc: 945.0,
     walletAddress: "0xB2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3",
     email: "code-forge@agents.clawwork.io",
+    inputSchema: {
+      fields: [
+        { name: "language", label: "Programming Language", type: "select" as const, required: true, options: ["TypeScript", "Python", "Rust", "Solidity", "Go", "Other"], default: "TypeScript" },
+        { name: "description", label: "What to Build", type: "textarea" as const, required: true, placeholder: "Describe the feature, API endpoint, or component you need", description: "Be specific about inputs, outputs, and expected behavior", validation: { minLength: 20, maxLength: 5000 } },
+        { name: "repo_url", label: "Repository URL", type: "url" as const, required: false, placeholder: "https://github.com/your/repo", description: "Link to existing codebase if this is an addition" },
+        { name: "tests_required", label: "Include Tests", type: "boolean" as const, required: false, default: true },
+        { name: "framework", label: "Framework/Stack", type: "text" as const, required: false, placeholder: "e.g. Next.js, Express, FastAPI" },
+      ],
+      additionalNotes: true,
+    },
   },
   {
     name: "data-wizard",
@@ -44,6 +64,15 @@ const DEMO_AGENTS = [
     totalEarnedUsdc: 468.0,
     walletAddress: "0xC3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4",
     email: null,
+    inputSchema: {
+      fields: [
+        { name: "data_source", label: "Data Source", type: "text" as const, required: true, placeholder: "URL, file path, or description of data", description: "Where is the data? Paste a URL, describe the format, or upload a file" },
+        { name: "questions", label: "Questions to Answer", type: "textarea" as const, required: true, placeholder: "What insights are you looking for?", validation: { minLength: 10, maxLength: 2000 } },
+        { name: "viz_type", label: "Visualization Preference", type: "select" as const, required: false, options: ["charts", "dashboard", "jupyter-notebook", "raw-data", "no-preference"], default: "no-preference" },
+        { name: "output_format", label: "Output Format", type: "select" as const, required: true, options: ["jupyter-notebook", "python-script", "csv-report", "pdf-report"], default: "jupyter-notebook" },
+      ],
+      additionalNotes: true,
+    },
   },
   {
     name: "content-crafter",
@@ -58,6 +87,17 @@ const DEMO_AGENTS = [
     totalEarnedUsdc: 417.0,
     walletAddress: "0xD4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5",
     email: "content-crafter@agents.clawwork.io",
+    inputSchema: {
+      fields: [
+        { name: "content_type", label: "Content Type", type: "select" as const, required: true, options: ["blog-post", "documentation", "social-media", "email-sequence", "landing-page", "whitepaper"], default: "blog-post" },
+        { name: "topic", label: "Topic/Subject", type: "text" as const, required: true, placeholder: "e.g. AI agent architecture for developers", validation: { minLength: 3, maxLength: 300 } },
+        { name: "tone", label: "Tone & Style", type: "select" as const, required: false, options: ["professional", "casual", "technical", "conversational", "academic"], default: "professional" },
+        { name: "target_audience", label: "Target Audience", type: "text" as const, required: false, placeholder: "e.g. Web3 developers, startup founders" },
+        { name: "word_count", label: "Target Word Count", type: "number" as const, required: false, validation: { min: 100, max: 20000 } },
+        { name: "seo_keywords", label: "SEO Keywords", type: "text" as const, required: false, placeholder: "comma-separated keywords" },
+      ],
+      additionalNotes: true,
+    },
   },
   {
     name: "auto-pilot",
@@ -72,6 +112,15 @@ const DEMO_AGENTS = [
     totalEarnedUsdc: 388.0,
     walletAddress: "0xE5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6",
     email: null,
+    inputSchema: {
+      fields: [
+        { name: "process", label: "What to Automate", type: "textarea" as const, required: true, placeholder: "Describe the manual process you want automated", validation: { minLength: 20, maxLength: 3000 } },
+        { name: "trigger", label: "Trigger Event", type: "select" as const, required: false, options: ["manual", "cron-schedule", "webhook", "file-change", "api-event"], default: "manual" },
+        { name: "apis", label: "APIs/Services Involved", type: "text" as const, required: false, placeholder: "e.g. GitHub, Slack, AWS S3, PostgreSQL" },
+        { name: "frequency", label: "How Often", type: "select" as const, required: false, options: ["one-time", "hourly", "daily", "weekly", "on-demand"], default: "one-time" },
+      ],
+      additionalNotes: true,
+    },
   },
   {
     name: "design-mind",
@@ -86,6 +135,17 @@ const DEMO_AGENTS = [
     totalEarnedUsdc: 224.0,
     walletAddress: "0xF6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1",
     email: "design-mind@agents.clawwork.io",
+    inputSchema: {
+      fields: [
+        { name: "design_type", label: "Design Type", type: "select" as const, required: true, options: ["landing-page", "dashboard", "mobile-app", "component-library", "design-system", "icon-set"], default: "landing-page" },
+        { name: "description", label: "Design Brief", type: "textarea" as const, required: true, placeholder: "Describe what you need designed — style, colors, use case", validation: { minLength: 10, maxLength: 3000 } },
+        { name: "style_ref", label: "Style Reference", type: "url" as const, required: false, placeholder: "https://dribbble.com/shots/...", description: "Link to a reference design or style guide" },
+        { name: "dimensions", label: "Output Dimensions", type: "select" as const, required: false, options: ["1024x1024", "1920x1080", "1440x900", "375x812", "custom"], default: "1920x1080" },
+        { name: "theme", label: "Theme Preference", type: "select" as const, required: false, options: ["dark", "light", "auto", "no-preference"], default: "dark" },
+        { name: "include_code", label: "Include CSS/Tailwind Code", type: "boolean" as const, required: false, default: true },
+      ],
+      additionalNotes: true,
+    },
   },
   {
     name: "shady-bot",
@@ -268,6 +328,7 @@ export async function seedDatabase() {
       totalEarnedUsdc: agent.totalEarnedUsdc,
       walletAddress: agent.walletAddress,
       email: agent.email,
+      inputSchema: (agent as any).inputSchema ? JSON.stringify((agent as any).inputSchema) : null,
       apiKey: hash,
       apiKeyPrefix: prefix,
       createdAt: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),

@@ -3,6 +3,7 @@ import { generateApiKey, jsonError, jsonSuccess, LIMITS, validateString } from "
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { sendWelcomeEmail } from "@/lib/email";
 import { getSession } from "@/lib/session";
+import { validateInputSchema } from "@/lib/input-schema";
 import { v4 as uuid } from "uuid";
 import { eq } from "drizzle-orm";
 
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     if (!rl.allowed) return rateLimitError(rl.remaining, rl.retryAfterMs);
 
     const body = await request.json();
-    const { name, displayName, bio, platform, walletAddress, skills, email } = body;
+    const { name, displayName, bio, platform, walletAddress, skills, email, inputSchema } = body;
 
     // Validate required fields
     if (!name || typeof name !== "string") {
@@ -71,6 +72,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // Validate inputSchema if provided
+    let inputSchemaJson: string | null = null;
+    if (inputSchema !== undefined && inputSchema !== null) {
+      const schemaError = validateInputSchema(inputSchema);
+      if (schemaError) {
+        return jsonError(`Invalid inputSchema: ${schemaError}`, 400);
+      }
+      inputSchemaJson = JSON.stringify(inputSchema);
+    }
+
     // Validate email if provided
     const validatedEmail = email && typeof email === "string" ? email.trim().slice(0, 320) : null;
 
@@ -96,6 +107,7 @@ export async function POST(request: Request) {
       walletAddress: walletAddress || null,
       skills: JSON.stringify(parsedSkills),
       email: validatedEmail,
+      inputSchema: inputSchemaJson,
       status: "pending",
       apiKey: hash,
       apiKeyPrefix: prefix,
