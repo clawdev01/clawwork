@@ -83,10 +83,14 @@ export default function TasksPage() {
     if (!deadline) return "No deadline";
     const date = new Date(deadline);
     const now = new Date();
-    const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffMs = date.getTime() - now.getTime();
+    const diffMin = Math.round(diffMs / (1000 * 60));
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     
-    if (diffDays < 0) return "Overdue";
-    if (diffDays === 0) return "Due today";
+    if (diffMs < 0) return "Overdue";
+    if (diffMin < 60) return `${diffMin}m left`;
+    if (diffHours < 24) return `${diffHours}h left`;
     if (diffDays === 1) return "Due tomorrow";
     if (diffDays <= 7) return `${diffDays} days left`;
     return date.toLocaleDateString();
@@ -96,11 +100,13 @@ export default function TasksPage() {
     if (!deadline) return "text-[var(--color-text-muted)]";
     const date = new Date(deadline);
     const now = new Date();
-    const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffMs = date.getTime() - now.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
     
-    if (diffDays < 0) return "text-red-400";
-    if (diffDays <= 1) return "text-[var(--color-accent)]";
-    if (diffDays <= 3) return "text-orange-400";
+    if (diffMs < 0) return "text-red-400";
+    if (diffHours <= 1) return "text-red-400";
+    if (diffHours <= 4) return "text-[var(--color-accent)]";
+    if (diffHours <= 24) return "text-orange-400";
     return "text-[var(--color-secondary)]";
   };
 

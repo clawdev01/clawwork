@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/providers/Web3Provider";
 import { useAccount } from "wagmi";
 import { ConnectKitButton } from "connectkit";
 
 type AgentSelectionMode = "open-bids" | "auto-match" | "direct-hire";
+type DeadlineOption = "asap" | "1h" | "4h" | "24h" | "custom";
 
 interface AgentInfo {
   id: string;
@@ -21,7 +23,10 @@ interface AgentInfo {
   portfolioPreview?: { title: string; inputExample: string | null; outputExample: string | null };
 }
 
-export default function NewTaskPage() {
+function NewTaskForm() {
+  const searchParams = useSearchParams();
+  const agentParam = searchParams.get("agent");
+
   const { isSignedIn, signIn } = useAuth();
   const { isConnected } = useAccount();
 
@@ -30,7 +35,8 @@ export default function NewTaskPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("other");
   const [budget, setBudget] = useState("");
-  const [deadline, setDeadline] = useState("");
+  const [deadlineOption, setDeadlineOption] = useState<DeadlineOption>("asap");
+  const [customDeadline, setCustomDeadline] = useState("");
   const [skills, setSkills] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; taskUrl?: string } | null>(null);
@@ -44,15 +50,49 @@ export default function NewTaskPage() {
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
+  const [preselectedAgentLoading, setPreselectedAgentLoading] = useState(!!agentParam);
 
   // Auth
   const [authMode, setAuthMode] = useState<"wallet" | "apikey">("wallet");
 
   const categories = ["research", "coding", "design", "data", "writing", "automation", "other"];
 
-  // Fetch agents when direct hire mode is selected
+  const deadlineOptions: { value: DeadlineOption; label: string; icon: string }[] = [
+    { value: "asap", label: "ASAP", icon: "⚡" },
+    { value: "1h", label: "1 hour", icon: "⏱️" },
+    { value: "4h", label: "4 hours", icon: "⏱️" },
+    { value: "24h", label: "24 hours", icon: "⏱️" },
+    { value: "custom", label: "Custom", icon: "📅" },
+  ];
+
+  // Handle ?agent= URL parameter — fetch and pre-select the agent
   useEffect(() => {
-    if (agentMode === "direct-hire" && agents.length === 0 && !agentsLoading) {
+    if (!agentParam) return;
+    setAgentMode("direct-hire");
+    setPreselectedAgentLoading(true);
+
+    // Fetch all agents first (needed for the agent list), then find our target
+    fetch("/api/agents?status=active&limit=50&includePortfolio=true")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          const allAgents = data.agents || [];
+          setAgents(allAgents);
+          const match = allAgents.find(
+            (a: AgentInfo) => a.name.toLowerCase() === agentParam.toLowerCase()
+          );
+          if (match) {
+            setSelectedAgent(match);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPreselectedAgentLoading(false));
+  }, [agentParam]);
+
+  // Fetch agents when direct hire mode is selected (if not already loaded)
+  useEffect(() => {
+    if (agentMode === "direct-hire" && agents.length === 0 && !agentsLoading && !agentParam) {
       setAgentsLoading(true);
       fetch("/api/agents?status=active&limit=50&includePortfolio=true")
         .then((r) => r.json())
@@ -62,7 +102,7 @@ export default function NewTaskPage() {
         .catch(() => {})
         .finally(() => setAgentsLoading(false));
     }
-  }, [agentMode]);
+  }, [agentMode, agents.length, agentsLoading, agentParam]);
 
   // Filter agents by search
   const filteredAgents = useMemo(() => {
@@ -82,6 +122,18 @@ export default function NewTaskPage() {
     [skills]
   );
 
+  // Compute deadline ISO string from option
+  const computeDeadline = (): string | undefined => {
+    if (deadlineOption === "asap") return undefined;
+    if (deadlineOption === "custom") return customDeadline ? new Date(customDeadline).toISOString() : undefined;
+    const hoursMap: Record<string, number> = { "1h": 1, "4h": 4, "24h": 24 };
+    const hours = hoursMap[deadlineOption];
+    if (!hours) return undefined;
+    const d = new Date();
+    d.setHours(d.getHours() + hours);
+    return d.toISOString();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -98,7 +150,7 @@ export default function NewTaskPage() {
         description,
         category,
         budgetUsdc: parseFloat(budget),
-        deadline: deadline || undefined,
+        deadline: computeDeadline(),
         requiredSkills: parsedSkills,
       };
 
@@ -146,14 +198,45 @@ export default function NewTaskPage() {
     return "★".repeat(stars) + "☆".repeat(5 - stars);
   };
 
+  const subtitle = agentMode === "direct-hire" && selectedAgent
+    ? `Hiring ${selectedAgent.displayName || selectedAgent.name} for a task`
+    : "Describe what you need done";
+
   return (
     <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
       <div className="max-w-2xl mx-auto">
         <a href="/tasks" className="text-[var(--color-text-muted)] hover:text-white text-sm mb-6 inline-block">
           ← Back to tasks
         </a>
+
+        {/* Hiring header when pre-selected agent */}
+        {agentParam && selectedAgent && (
+          <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 rounded-2xl p-4 mb-6 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center text-2xl">🤖</div>
+            <div>
+              <div className="text-sm text-[var(--color-text-muted)]">Hiring</div>
+              <div className="text-lg font-bold">{selectedAgent.displayName || selectedAgent.name}</div>
+              {selectedAgent.taskRateUsdc && (
+                <div className="text-xs text-[var(--color-text-muted)]">${selectedAgent.taskRateUsdc}/task · {selectedAgent.tasksCompleted} tasks completed</div>
+              )}
+            </div>
+            <a
+              href={`/agents/${selectedAgent.name}`}
+              className="ml-auto text-xs text-[var(--color-text-muted)] hover:text-white border border-[var(--color-border)] px-3 py-1.5 rounded-lg transition-colors"
+            >
+              View Profile
+            </a>
+          </div>
+        )}
+
+        {preselectedAgentLoading && (
+          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 mb-6 text-center text-[var(--color-text-muted)]">
+            Loading agent...
+          </div>
+        )}
+
         <h1 className="text-3xl font-bold mb-2">Post a Task</h1>
-        <p className="text-[var(--color-text-muted)] mb-8">Describe what you need done. Agents will bid on your task.</p>
+        <p className="text-[var(--color-text-muted)] mb-8">{subtitle}</p>
 
         {result?.success ? (
           <div className="bg-[var(--color-surface)] border border-[var(--color-secondary)]/50 rounded-2xl p-8 text-center">
@@ -174,7 +257,7 @@ export default function NewTaskPage() {
         ) : (
           <form onSubmit={handleSubmit} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
             <div className="space-y-6">
-              {/* Auth method selector */}
+              {/* ═══ Auth ═══ */}
               <div>
                 <label className="block text-sm font-medium mb-3">How to authenticate</label>
                 <div className="flex gap-2 mb-4">
@@ -249,7 +332,7 @@ export default function NewTaskPage() {
                 )}
               </div>
 
-              {/* Title */}
+              {/* ═══ Title ═══ */}
               <div>
                 <label className="block text-sm font-medium mb-2">Task Title *</label>
                 <input
@@ -262,7 +345,7 @@ export default function NewTaskPage() {
                 />
               </div>
 
-              {/* Description */}
+              {/* ═══ Description ═══ */}
               <div>
                 <label className="block text-sm font-medium mb-2">Description *</label>
                 <textarea
@@ -273,6 +356,95 @@ export default function NewTaskPage() {
                   placeholder="Describe exactly what you need. Be specific about deliverables, format, and quality expectations."
                   required
                 />
+              </div>
+
+              {/* ═══ Category & Budget ═══ */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Category</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  >
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Budget (USDC) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                    placeholder="5.00"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* ═══ Required Skills ═══ */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Required Skills</label>
+                <input
+                  type="text"
+                  value={skills}
+                  onChange={(e) => setSkills(e.target.value)}
+                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  placeholder="research, analysis, python (comma-separated)"
+                />
+                {parsedSkills.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {parsedSkills.map((s) => (
+                      <span
+                        key={s}
+                        className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/20"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ═══ Deadline ═══ */}
+              <div>
+                <label className="block text-sm font-medium mb-3">Deadline</label>
+                <div className="flex flex-wrap gap-2">
+                  {deadlineOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setDeadlineOption(opt.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
+                        deadlineOption === opt.value
+                          ? "bg-[var(--color-primary)]/15 border-[var(--color-primary)]/40 text-[var(--color-primary)]"
+                          : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-white hover:border-[var(--color-text-muted)]/40"
+                      }`}
+                    >
+                      {opt.icon} {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {deadlineOption === "custom" && (
+                  <input
+                    type="datetime-local"
+                    value={customDeadline}
+                    onChange={(e) => setCustomDeadline(e.target.value)}
+                    className="mt-3 w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  />
+                )}
+                {deadlineOption !== "asap" && deadlineOption !== "custom" && (
+                  <p className="text-xs text-[var(--color-text-muted)] mt-2">
+                    Deadline will be set to {deadlineOption === "1h" ? "1 hour" : deadlineOption === "4h" ? "4 hours" : "24 hours"} from when you submit
+                  </p>
+                )}
               </div>
 
               {/* ═══════════════ AGENT SELECTION MODE ═══════════════ */}
@@ -482,60 +654,6 @@ export default function NewTaskPage() {
               </div>
               {/* ═══════════════ END AGENT SELECTION ═══════════════ */}
 
-              {/* Category & Budget */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Category</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  >
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c.charAt(0).toUpperCase() + c.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Budget (USDC) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                    placeholder="5.00"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Deadline */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Deadline</label>
-                <input
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                />
-              </div>
-
-              {/* Required Skills */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Required Skills</label>
-                <input
-                  type="text"
-                  value={skills}
-                  onChange={(e) => setSkills(e.target.value)}
-                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                  placeholder="research, analysis, python (comma-separated)"
-                />
-              </div>
-
               {/* Error */}
               {result && !result.success && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
@@ -562,5 +680,17 @@ export default function NewTaskPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function NewTaskPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--color-bg)] px-6 py-8">
+        <div className="max-w-2xl mx-auto text-center text-[var(--color-text-muted)] py-12">Loading...</div>
+      </div>
+    }>
+      <NewTaskForm />
+    </Suspense>
   );
 }

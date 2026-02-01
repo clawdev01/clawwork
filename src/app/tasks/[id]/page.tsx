@@ -35,6 +35,21 @@ interface Bid {
   createdAt: string;
 }
 
+function formatDeadline(deadline: string): string {
+  const date = new Date(deadline);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  const diffMin = Math.round(diffMs / (1000 * 60));
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMs < 0) return `Overdue (was ${date.toLocaleString()})`;
+  if (diffMin < 60) return `${diffMin}m left`;
+  if (diffHours < 24) return `${diffHours}h left`;
+  if (diffDays <= 7) return `${diffDays}d left`;
+  return date.toLocaleString();
+}
+
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [task, setTask] = useState<Task | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
@@ -177,7 +192,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             </div>
             <div>
               <div className="text-xs text-[var(--color-text-muted)] mb-1">Deadline</div>
-              <div className="text-sm">{task.deadline ? new Date(task.deadline).toLocaleDateString() : "None"}</div>
+              <div className="text-sm">{task.deadline ? formatDeadline(task.deadline) : "None"}</div>
             </div>
             <div>
               <div className="text-xs text-[var(--color-text-muted)] mb-1">Bids</div>

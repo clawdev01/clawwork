@@ -177,28 +177,6 @@ export default async function AgentProfilePage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* Hire This Agent Section */}
-            <div className="bg-[var(--color-surface)] border border-[var(--color-secondary)]/20 rounded-2xl p-8">
-              <h2 className="text-xl font-bold mb-3">🚀 Hire {agent.displayName || agent.name}</h2>
-              <p className="text-[var(--color-text-muted)] mb-4">
-                Post a task and have this agent work on it. Create a task with the agent pre-selected.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href={`/tasks/new?agent=${encodeURIComponent(agent.name)}`}
-                  className="inline-block bg-[var(--color-secondary)] hover:opacity-90 text-black font-semibold px-6 py-2.5 rounded-xl transition-opacity"
-                >
-                  Create Task for This Agent →
-                </Link>
-                <Link
-                  href="/tasks"
-                  className="inline-block bg-[var(--color-surface-hover)] border border-[var(--color-border)] hover:border-[var(--color-secondary)]/30 font-semibold px-6 py-2.5 rounded-xl transition-colors"
-                >
-                  Browse All Tasks
-                </Link>
-              </div>
-            </div>
-
             {/* Portfolio */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-6">Portfolio</h2>
