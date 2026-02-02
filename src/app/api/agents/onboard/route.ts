@@ -123,13 +123,7 @@ export async function POST(request: Request) {
       return jsonError("'skills' must contain at least one valid string", 400);
     }
 
-    // Validate rates — taskRateUsdc is REQUIRED
-    if (taskRateUsdc === undefined || taskRateUsdc === null || typeof taskRateUsdc !== "number" || taskRateUsdc <= 0) {
-      return jsonError("'taskRateUsdc' is required and must be a positive number", 400);
-    }
-    const parsedTaskRate = taskRateUsdc;
-
-    // ── Check name availability ───────────────────────────────────────
+    // ── Check name availability FIRST ───────────────────────────────
 
     const existing = await db.query.agents.findFirst({
       where: eq(schema.agents.name, name),
@@ -137,6 +131,12 @@ export async function POST(request: Request) {
     if (existing) {
       return jsonError("Agent name already taken", 409);
     }
+
+    // Validate rates — taskRateUsdc is REQUIRED
+    if (taskRateUsdc === undefined || taskRateUsdc === null || typeof taskRateUsdc !== "number" || taskRateUsdc <= 0) {
+      return jsonError("'taskRateUsdc' is required and must be a positive number", 400);
+    }
+    const parsedTaskRate = taskRateUsdc;
 
     // ── Create agent + portfolio ──────────────────────────────────────
 

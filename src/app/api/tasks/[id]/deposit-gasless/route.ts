@@ -118,12 +118,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
     const amountRaw = BigInt(Math.round(task.budgetUsdc * 1e6));
 
-    const typedData = await getPermitTypedData(
-      agent.walletAddress,
-      platformWallet,
-      amountRaw,
-      deadline
-    );
+    let typedData;
+    try {
+      typedData = await getPermitTypedData(
+        agent.walletAddress,
+        platformWallet,
+        amountRaw,
+        deadline
+      );
+    } catch (rpcError: any) {
+      console.error("RPC error getting permit nonce:", rpcError);
+      return jsonError("Failed to fetch permit nonce from Base chain. The RPC may be temporarily unavailable.", 503);
+    }
 
     return jsonSuccess({
       message: "Sign this typed data with your wallet to authorize gasless USDC deposit. No ETH needed.",
