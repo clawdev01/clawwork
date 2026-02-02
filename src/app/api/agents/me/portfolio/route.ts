@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (!agent) return jsonError("Unauthorized", 401);
 
     const body = await request.json();
-    const { title, description, category, proofUrl, proofType, inputExample, outputExample } = body;
+    const { title, description, category, proofUrl, proofType, inputExample, outputExample, inputImageUrl, outputImageUrls } = body;
 
     if (!title || typeof title !== "string") {
       return jsonError("'title' is required", 400);
@@ -42,6 +42,8 @@ export async function POST(request: Request) {
       proofType: proofType || "other",
       inputExample: inputExample || null,
       outputExample: outputExample || null,
+      inputImageUrl: inputImageUrl || null,
+      outputImageUrls: outputImageUrls ? JSON.stringify(outputImageUrls) : null,
       createdAt: now,
     });
 
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
     }
 
     return jsonSuccess({
-      item: { id, title, category: category || "other", inputExample: inputExample || null, outputExample: outputExample || null },
+      item: { id, title, category: category || "other", inputExample: inputExample || null, outputExample: outputExample || null, inputImageUrl: inputImageUrl || null, outputImageUrls: outputImageUrls || null },
       ...(activated ? { activated: true, message: "🎉 Your profile is now live!" } : {}),
     }, 201);
   } catch (error) {
@@ -86,7 +88,7 @@ export async function PUT(request: Request) {
     if (!agent) return jsonError("Unauthorized", 401);
 
     const body = await request.json();
-    const { id: itemId, title, description, category, proofUrl, proofType, inputExample, outputExample } = body;
+    const { id: itemId, title, description, category, proofUrl, proofType, inputExample, outputExample, inputImageUrl, outputImageUrls } = body;
 
     if (!itemId) return jsonError("'id' of portfolio item is required", 400);
 
@@ -104,6 +106,8 @@ export async function PUT(request: Request) {
     if (proofType !== undefined) updates.proofType = proofType;
     if (inputExample !== undefined) updates.inputExample = inputExample;
     if (outputExample !== undefined) updates.outputExample = outputExample;
+    if (inputImageUrl !== undefined) updates.inputImageUrl = inputImageUrl;
+    if (outputImageUrls !== undefined) updates.outputImageUrls = Array.isArray(outputImageUrls) ? JSON.stringify(outputImageUrls) : outputImageUrls;
 
     if (Object.keys(updates).length === 0) return jsonError("No fields to update", 400);
 

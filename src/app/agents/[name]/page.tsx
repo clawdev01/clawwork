@@ -322,24 +322,55 @@ export default async function AgentProfilePage({ params }: PageProps) {
                       </p>
 
                       {/* Input/Output Examples */}
-                      {(item.inputExample || item.outputExample) && (
+                      {(item.inputExample || item.outputExample || item.inputImageUrl || item.outputImageUrls) && (
                         <div className="space-y-3 mb-4">
-                          {item.inputExample && (
+                          {/* Input */}
+                          {(item.inputExample || item.inputImageUrl) && (
                             <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-3">
                               <div className="text-xs font-semibold text-[var(--color-primary)] mb-1.5 flex items-center gap-1">
                                 📥 Example Input
                               </div>
-                              <p className="text-sm text-[var(--color-text-muted)] whitespace-pre-wrap break-words">{item.inputExample}</p>
+                              {item.inputImageUrl && (
+                                <div className="mb-2 rounded-lg overflow-hidden">
+                                  <img
+                                    src={item.inputImageUrl}
+                                    alt="Input example"
+                                    className="w-full h-auto rounded-lg"
+                                  />
+                                </div>
+                              )}
+                              {item.inputExample && (
+                                <p className="text-sm text-[var(--color-text-muted)] whitespace-pre-wrap break-words">{item.inputExample}</p>
+                              )}
                             </div>
                           )}
-                          {item.outputExample && (
-                            <div className="bg-[var(--color-secondary)]/5 border border-[var(--color-secondary)]/20 rounded-lg p-3">
-                              <div className="text-xs font-semibold text-[var(--color-secondary)] mb-1.5 flex items-center gap-1">
-                                📤 Example Output
+                          {/* Output */}
+                          {(item.outputExample || item.outputImageUrls) && (() => {
+                            const outputImages: string[] = item.outputImageUrls ? JSON.parse(item.outputImageUrls) : [];
+                            return (
+                              <div className="bg-[var(--color-secondary)]/5 border border-[var(--color-secondary)]/20 rounded-lg p-3">
+                                <div className="text-xs font-semibold text-[var(--color-secondary)] mb-1.5 flex items-center gap-1">
+                                  📤 Example Output
+                                </div>
+                                {outputImages.length > 0 && (
+                                  <div className={`grid gap-2 mb-2 ${outputImages.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                                    {outputImages.map((url, i) => (
+                                      <div key={i} className="rounded-lg overflow-hidden">
+                                        <img
+                                          src={url}
+                                          alt={`Output example ${i + 1}`}
+                                          className="w-full h-auto rounded-lg"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {item.outputExample && (
+                                  <p className="text-sm text-[var(--color-text-muted)] whitespace-pre-wrap break-words">{item.outputExample}</p>
+                                )}
                               </div>
-                              <p className="text-sm text-[var(--color-text-muted)] whitespace-pre-wrap break-words">{item.outputExample}</p>
-                            </div>
-                          )}
+                            );
+                          })()}
                           <p className="text-xs text-[var(--color-text-muted)] italic">
                             💡 Use this as a guide for your task description
                           </p>

@@ -50,6 +50,8 @@ export const portfolios = sqliteTable("portfolios", {
   proofType: text("proof_type").default("other"), // github_pr, document, image, api_response, other
   inputExample: text("input_example"), // example input to demonstrate capability
   outputExample: text("output_example"), // example output to demonstrate capability
+  inputImageUrl: text("input_image_url"), // URL of input image (for visual agents)
+  outputImageUrls: text("output_image_urls"), // JSON array of output image URLs
   createdAt: text("created_at").notNull(),
 });
 

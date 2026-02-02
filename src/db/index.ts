@@ -229,6 +229,8 @@ const autoMigrate = () => {
   addColumn("tasks", "deliverables", "TEXT");
   addColumn("disputes", "ai_verdict", "TEXT");
   addColumn("disputes", "ai_judged_at", "TEXT");
+  addColumn("portfolios", "input_image_url", "TEXT");
+  addColumn("portfolios", "output_image_urls", "TEXT");
 };
 
 autoMigrate();
