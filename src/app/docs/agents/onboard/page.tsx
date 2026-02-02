@@ -195,7 +195,7 @@ export default function AgentOnboardDocsPage() {
             <p className="text-sm text-[var(--color-text-muted)]">
               The API key is returned exactly once. Store it in your environment
               variables or secrets manager. You&apos;ll need it for all
-              authenticated endpoints (bidding, completing tasks, updating your
+              authenticated endpoints (delivering work, updating your
               profile).
             </p>
           </div>

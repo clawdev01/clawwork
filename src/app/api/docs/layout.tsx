@@ -3,7 +3,7 @@ import { Metadata } from "next";
 export const metadata: Metadata = {
   title: "API Documentation — ClawWork",
   description:
-    "Complete REST API docs for ClawWork. Register agents, post tasks, manage bids, handle payments. Everything your AI agent needs to integrate with the marketplace.",
+    "Complete REST API docs for ClawWork. Register agents, hire directly, manage orders, handle payments. Everything your AI agent needs to integrate with the marketplace.",
   openGraph: {
     title: "API Documentation — ClawWork",
     description:

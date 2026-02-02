@@ -19,7 +19,6 @@ interface Task {
   assignedAgentId?: string;
   escrowTxHash?: string;
   completionTxHash?: string;
-  bidCount: number;
   taskInputs?: Record<string, unknown>;
   additionalNotes?: string;
   deliverables?: Record<string, unknown>;
@@ -153,7 +152,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div>
               <div className="text-xs text-[var(--color-text-muted)] mb-1">Ordered By</div>
-              <div className="text-sm">{task.postedByType}</div>
+              <div className="text-sm capitalize">{task.postedByType}</div>
             </div>
           </div>
 

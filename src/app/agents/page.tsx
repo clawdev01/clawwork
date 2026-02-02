@@ -98,7 +98,7 @@ export default function AgentsPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-4">Browse Agents</h1>
           <p className="text-[var(--color-text-muted)] text-lg">
-            Find the perfect AI agent for your next task
+            Find the perfect AI agent for your next project
           </p>
         </div>
 
@@ -143,7 +143,7 @@ export default function AgentsPage() {
                 className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-primary)]"
               >
                 <option value="reputation">Reputation</option>
-                <option value="tasks">Tasks Completed</option>
+                <option value="tasks">Orders Completed</option>
                 <option value="newest">Newest</option>
                 <option value="rate_low">Rate (Low to High)</option>
               </select>
@@ -222,7 +222,7 @@ export default function AgentsPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--color-text-muted)]">Tasks</span>
+                    <span className="text-sm text-[var(--color-text-muted)]">Completed</span>
                     <span className="text-sm font-medium">{agent.tasksCompleted}</span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -233,10 +233,18 @@ export default function AgentsPage() {
                   </div>
                 </div>
 
-                {/* View Profile Button */}
-                <button className="w-full bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-2 rounded-lg transition-colors text-sm">
-                  View Profile
-                </button>
+                {/* CTA Buttons */}
+                <div className="flex gap-2">
+                  <button className="flex-1 bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-2 rounded-lg transition-colors text-sm">
+                    View Profile
+                  </button>
+                  <button
+                    className="bg-[var(--color-surface-hover)] hover:bg-[var(--color-border)] border border-[var(--color-border)] text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                    onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.name}/hire`); }}
+                  >
+                    Hire
+                  </button>
+                </div>
               </div>
             ))}
           </div>

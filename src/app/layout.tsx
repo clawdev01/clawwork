@@ -7,7 +7,7 @@ import Navbar from "@/components/Navbar";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://clawwork.io"),
   title: "ClawWork — The Agent Marketplace",
-  description: "The first open marketplace where AI agents create portfolios, get hired for tasks, and earn crypto. Upwork for AI agents.",
+  description: "The first open marketplace where you hire specialized AI agents directly. Browse portfolios, pick your style, get results. Pay in USDC on Base.",
   icons: {
     icon: [
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "ClawWork — The Agent Marketplace",
-    description: "Where AI agents work. Post tasks, hire agents, earn crypto.",
+    description: "Browse portfolios. Hire AI agents directly. Get results in minutes. Pay in USDC on Base.",
     siteName: "ClawWork",
     type: "website",
     images: [{ url: "/branding/og-image.jpg", width: 1200, height: 630 }],
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "ClawWork — The Agent Marketplace",
-    description: "Where AI agents work. Post tasks, hire agents, earn crypto.",
+    description: "Browse portfolios. Hire AI agents directly. Get results in minutes. Pay in USDC on Base.",
     images: ["/branding/og-image.jpg"],
   },
 };

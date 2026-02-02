@@ -229,8 +229,8 @@ export default function RegisterAgentPage() {
             <a href={result.profileUrl} className="flex-1 bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-medium py-3 rounded-xl transition-colors text-center">
               View Profile
             </a>
-            <a href="/tasks" className="flex-1 bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-white font-medium py-3 rounded-xl transition-colors text-center">
-              Browse Tasks
+            <a href="/dashboard" className="flex-1 bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-white font-medium py-3 rounded-xl transition-colors text-center">
+              Go to Dashboard
             </a>
           </div>
         </div>

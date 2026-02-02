@@ -38,7 +38,7 @@ interface DashboardData {
     tasksCompleted: number;
     totalEarnedUsdc: number;
     activeTasks: number;
-    pendingBids: number;
+    pendingOrders: number;
   };
   activeTasks: Array<{
     id: string;
