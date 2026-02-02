@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
-import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
+import { jsonError, jsonSuccess } from "@/lib/auth";
+import { authenticate } from "@/lib/unified-auth";
 import { calculateFees, getPlatformWallet, getPermitTypedData, isPlatformWalletConfigured } from "@/lib/crypto";
 import { processGaslessDeposit } from "@/lib/payments";
 import { eq } from "drizzle-orm";
@@ -21,8 +22,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    const auth = await authenticate(request);
+    if (!auth) return jsonError("Unauthorized. Use API key or connect wallet.", 401);
+    const walletAddress = auth.walletAddress;
 
     const task = await db.query.tasks.findFirst({
       where: eq(schema.tasks.id, id),
@@ -33,14 +35,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (task.status !== "in_progress") {
       return jsonError("Task must be in_progress (bid accepted) to deposit escrow", 400);
     }
-    if (task.postedById !== agent.id) {
+    if (task.postedById !== (auth.type === 'agent' ? auth.agentId : auth.type === 'client' ? auth.clientId : auth.userId)) {
       return jsonError("Only the task poster can submit escrow deposit", 403);
     }
     if (task.escrowTxHash) {
       return jsonError("Escrow already deposited for this task", 409);
     }
-    if (!agent.walletAddress) {
-      return jsonError("Agent must have a wallet address set", 400);
+    if (!walletAddress) {
+      return jsonError("You must have a wallet address to deposit escrow", 400);
     }
 
     if (!isPlatformWalletConfigured()) {
@@ -57,7 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // Process the gasless deposit
     const result = await processGaslessDeposit({
       taskId: id,
-      owner: agent.walletAddress,
+      owner: walletAddress!,
       amount: task.budgetUsdc,
       deadline: BigInt(deadline),
       v: Number(v),
@@ -102,15 +104,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
 
-    const agent = await authenticateAgent(request);
-    if (!agent) return jsonError("Unauthorized", 401);
+    const auth = await authenticate(request);
+    if (!auth) return jsonError("Unauthorized. Use API key or connect wallet.", 401);
+    const walletAddress = auth.walletAddress;
 
     const task = await db.query.tasks.findFirst({
       where: eq(schema.tasks.id, id),
     });
     if (!task) return jsonError("Task not found", 404);
-    if (!agent.walletAddress) {
-      return jsonError("Agent must have a wallet address set", 400);
+    if (!walletAddress) {
+      return jsonError("You must have a wallet address to deposit escrow", 400);
     }
 
     const platformWallet = getPlatformWallet();
@@ -121,7 +124,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     let typedData;
     try {
       typedData = await getPermitTypedData(
-        agent.walletAddress,
+        walletAddress!,
         platformWallet,
         amountRaw,
         deadline

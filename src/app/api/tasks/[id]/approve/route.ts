@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const auth = await authenticate(request);
     if (!auth) return jsonError("Unauthorized", 401);
 
-    const callerId = auth.type === "agent" ? auth.agentId! : auth.userId!;
+    const callerId = auth.type === "agent" ? auth.agentId! : auth.type === "client" ? auth.clientId! : auth.userId!;
 
     const body = await request.json().catch(() => ({}));
 

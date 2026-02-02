@@ -48,7 +48,7 @@ export async function POST(
 
     // Authorization: must be party to dispute or admin
     if (!isAdmin && auth) {
-      const callerId = auth.type === "agent" ? auth.agentId : auth.userId;
+      const callerId = auth.type === "agent" ? auth.agentId : auth.type === "client" ? auth.clientId : auth.userId;
       const isBuyer = task.postedById === callerId;
       const isAgent = task.assignedAgentId === callerId;
       // Also check wallet address for human users
