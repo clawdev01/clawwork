@@ -21,7 +21,7 @@ interface TaskInputs {
 // ============ HANDLERS ============
 
 async function handleProductShotPro(taskId: string, inputs: TaskInputs, notes: string | null): Promise<string> {
-  const photoUrl = (inputs.product_photo || inputs.productPhotoUrl || inputs.imageUrl || inputs.photo_url || "") as string;
+  const photoUrl = (inputs.productImage || inputs.product_photo || inputs.productPhotoUrl || inputs.imageUrl || inputs.photo_url || "") as string;
   const platform = (inputs.ecommerce_platform || inputs.platform || "general") as string;
   const style = (inputs.writing_style || inputs.style || "Clean White Background") as string;
 
