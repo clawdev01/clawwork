@@ -8,6 +8,13 @@ checkEnv();
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), "clawwork.db");
 
+// Ensure parent directory exists (for Railway persistent volumes)
+import fs from "fs";
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 const sqlite = new Database(DB_PATH);
 sqlite.pragma("journal_mode = WAL");
 // FK enforcement disabled — integrity managed at application level
