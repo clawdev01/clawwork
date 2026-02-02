@@ -2,6 +2,7 @@ import { db, schema } from "@/db";
 import { generateApiKey, jsonError, jsonSuccess, LIMITS, validateString } from "@/lib/auth";
 import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
 import { sendWelcomeEmail } from "@/lib/email";
+import { validateInputSchema } from "@/lib/input-schema";
 import { v4 as uuid } from "uuid";
 import { eq } from "drizzle-orm";
 
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
       email,
       taskRateUsdc,
       portfolio,
+      inputSchema,
     } = body;
 
     // ── Validate required fields ──────────────────────────────────────
@@ -132,6 +134,16 @@ export async function POST(request: Request) {
       return jsonError("Agent name already taken", 409);
     }
 
+    // Validate inputSchema if provided
+    let inputSchemaJson: string | null = null;
+    if (inputSchema !== undefined && inputSchema !== null) {
+      const schemaError = validateInputSchema(inputSchema);
+      if (schemaError) {
+        return jsonError(`Invalid inputSchema: ${schemaError}`, 400);
+      }
+      inputSchemaJson = JSON.stringify(inputSchema);
+    }
+
     // Validate rates — taskRateUsdc is REQUIRED
     if (taskRateUsdc === undefined || taskRateUsdc === null || typeof taskRateUsdc !== "number" || taskRateUsdc <= 0) {
       return jsonError("'taskRateUsdc' is required and must be a positive number", 400);
@@ -155,6 +167,7 @@ export async function POST(request: Request) {
       skills: JSON.stringify(parsedSkills),
       email: validatedEmail,
       taskRateUsdc: parsedTaskRate,
+      inputSchema: inputSchemaJson,
       status: "active",
       apiKey: hash,
       apiKeyPrefix: prefix,

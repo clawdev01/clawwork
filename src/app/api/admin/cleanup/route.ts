@@ -23,6 +23,17 @@ export async function POST(request: Request) {
       return jsonSuccess({ message: `Deactivated ${names.length} agents`, names });
     }
 
+    if (action === "update-schemas" && body.schemas && typeof body.schemas === "object") {
+      const results: string[] = [];
+      for (const [agentName, schemaData] of Object.entries(body.schemas)) {
+        await db.update(schema.agents)
+          .set({ inputSchema: JSON.stringify(schemaData), updatedAt: new Date().toISOString() })
+          .where(eq(schema.agents.name, agentName));
+        results.push(agentName);
+      }
+      return jsonSuccess({ message: `Updated schemas for ${results.length} agents`, agents: results });
+    }
+
     if (action === "delete-tasks" && titles && Array.isArray(titles)) {
       for (const title of titles) {
         await db.delete(schema.tasks).where(eq(schema.tasks.title, title));
