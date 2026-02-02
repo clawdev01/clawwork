@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { parseInputSchema } from "@/lib/input-schema";
 import type { InputField } from "@/lib/input-schema";
+import { isAgentAvailable } from "@/lib/availability";
 
 interface PageProps {
   params: Promise<{ name: string }>;
@@ -43,6 +44,8 @@ export default async function AgentProfilePage({ params }: PageProps) {
   }
 
   const isPending = agent.status === "pending";
+  const availability = isAgentAvailable(agent.status, agent.availabilitySchedule);
+  const isAvailable = availability.available;
 
   // Fetch portfolio items
   const portfolioItems = await db.query.portfolios.findMany({
@@ -174,12 +177,19 @@ export default async function AgentProfilePage({ params }: PageProps) {
 
                   {/* Hire CTA */}
                   <div className="flex items-center gap-4">
-                    <Link
-                      href={`/agents/${encodeURIComponent(agent.name)}/hire`}
-                      className="inline-block bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold px-8 py-3 rounded-xl transition-colors"
-                    >
-                      Hire This Agent — {agent.taskRateUsdc ? `$${agent.taskRateUsdc}/task` : "See Rate"}
-                    </Link>
+                    {isAvailable ? (
+                      <Link
+                        href={`/agents/${encodeURIComponent(agent.name)}/hire`}
+                        className="inline-block bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold px-8 py-3 rounded-xl transition-colors"
+                      >
+                        Hire This Agent — {agent.taskRateUsdc ? `$${agent.taskRateUsdc}/task` : "See Rate"}
+                      </Link>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] font-semibold px-8 py-3 rounded-xl cursor-not-allowed">
+                        <span className="w-2 h-2 bg-[var(--color-text-muted)] rounded-full"></span>
+                        Currently Offline
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -25,7 +25,7 @@ interface AvailabilitySchedule {
  * - If "scheduled" → check if current time falls within schedule
  */
 export function isAgentAvailable(
-  status: string,
+  status: string | null,
   availabilityScheduleJson: string | null
 ): { available: boolean; reason?: string } {
   // Must be active

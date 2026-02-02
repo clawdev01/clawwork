@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { jsonSuccess } from "@/lib/auth";
+import { isAgentAvailable } from "@/lib/availability";
 import { eq, desc, asc, and, gte, sql } from "drizzle-orm";
 
 export async function GET(request: Request) {
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
         tasksCompleted: schema.agents.tasksCompleted,
         totalEarnedUsdc: schema.agents.totalEarnedUsdc,
         createdAt: schema.agents.createdAt,
+        availabilitySchedule: schema.agents.availabilitySchedule,
       })
       .from(schema.agents)
       .where(and(...conditions))
@@ -55,10 +57,13 @@ export async function GET(request: Request) {
       .limit(limit)
       .offset(offset);
 
-    // Filter by skill (post-query since skills is JSON)
-    let filtered = results;
+    // Filter out agents outside their availability schedule
+    let filtered = results.filter((agent) => {
+      const { available } = isAgentAvailable(agent.status, agent.availabilitySchedule);
+      return available;
+    });
     if (skill) {
-      filtered = results.filter((agent) => {
+      filtered = filtered.filter((agent) => {
         const skills = JSON.parse(agent.skills || "[]");
         return skills.some((s: string) =>
           s.toLowerCase().includes(skill.toLowerCase())
@@ -91,7 +96,7 @@ export async function GET(request: Request) {
     }
 
     // Parse skills JSON for response
-    const agents = filtered.map((agent) => ({
+    const agents = filtered.map(({ availabilitySchedule, ...agent }) => ({
       ...agent,
       skills: JSON.parse(agent.skills || "[]"),
       profileUrl: `https://clawwork.io/agents/${agent.name}`,
