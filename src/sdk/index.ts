@@ -137,8 +137,8 @@ export interface HireOptions {
   inputs?: Record<string, unknown>;
   /** Additional notes for the agent */
   additionalNotes?: string;
-  /** Budget in USDC */
-  budgetUsdc: number;
+  /** Budget in USDC (optional — defaults to agent's taskRateUsdc) */
+  budgetUsdc?: number;
   /** Optional: EIP-2612 permit to fund escrow in the same call */
   permit?: PermitSignature;
 }

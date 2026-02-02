@@ -132,12 +132,8 @@ export async function POST(request: Request) {
     if (description.length > LIMITS.description) {
       return jsonError(`'description' must be ${LIMITS.description} characters or less`, 400);
     }
-    if (!budgetUsdc || typeof budgetUsdc !== "number" || budgetUsdc <= 0) {
-      return jsonError("'budgetUsdc' must be a positive number", 400);
-    }
-    if (budgetUsdc > 100000) {
-      return jsonError("'budgetUsdc' must be 100,000 or less", 400);
-    }
+    // budgetUsdc is optional — defaults to the agent's taskRateUsdc
+    // (will be resolved after agent lookup below)
 
     // Validate taskInputs against agent's inputSchema
     let taskInputsJson: string | null = null;
@@ -159,13 +155,25 @@ export async function POST(request: Request) {
 
     // Verify agent exists and is active
     const [hiredAgent] = await db
-      .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status, inputSchema: schema.agents.inputSchema })
+      .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status, inputSchema: schema.agents.inputSchema, taskRateUsdc: schema.agents.taskRateUsdc })
       .from(schema.agents)
       .where(eq(schema.agents.id, directHireAgentId))
       .limit(1);
 
     if (!hiredAgent || hiredAgent.status !== "active") {
       return jsonError("Selected agent not found or not active", 400);
+    }
+
+    // Resolve budget: use agent's rate if not provided
+    const resolvedBudget = (typeof budgetUsdc === "number" && budgetUsdc > 0)
+      ? budgetUsdc
+      : hiredAgent.taskRateUsdc;
+
+    if (!resolvedBudget || resolvedBudget <= 0) {
+      return jsonError("Could not determine budget. Agent has no taskRateUsdc set and no budgetUsdc was provided.", 400);
+    }
+    if (resolvedBudget > 100000) {
+      return jsonError("Budget must be 100,000 USDC or less", 400);
     }
 
     // Validate taskInputs against agent's inputSchema
@@ -186,7 +194,7 @@ export async function POST(request: Request) {
       category: category || "other",
       postedByType: posterType,
       postedById: posterId,
-      budgetUsdc,
+      budgetUsdc: resolvedBudget,
       deadline: deadline || null,
       requiredSkills: JSON.stringify(requiredSkills || []),
       taskInputs: taskInputsJson,
@@ -209,7 +217,7 @@ export async function POST(request: Request) {
       id: bidId,
       taskId: id,
       agentId: directHireAgentId,
-      amountUsdc: budgetUsdc,
+      amountUsdc: resolvedBudget,
       proposal: "Direct hire — selected by customer.",
       estimatedHours: null,
       status: "accepted",
@@ -246,7 +254,7 @@ export async function POST(request: Request) {
         taskId: id,
         title,
         description,
-        budgetUsdc,
+        budgetUsdc: resolvedBudget,
         taskInputs: taskInputs || null,
         additionalNotes: additionalNotesStr,
         directHire: true,
@@ -273,7 +281,7 @@ export async function POST(request: Request) {
           const depositResult = await processGaslessDeposit({
             taskId: id,
             owner: posterAgent.walletAddress,
-            amount: budgetUsdc,
+            amount: resolvedBudget,
             deadline: BigInt(permit.deadline),
             v: Number(permit.v),
             r: permit.r as `0x${string}`,
@@ -297,7 +305,7 @@ export async function POST(request: Request) {
         task: {
           id,
           title,
-          budgetUsdc,
+          budgetUsdc: resolvedBudget,
           status: "in_progress",
           assignedAgentId: directHireAgentId,
           assignedAgent: {

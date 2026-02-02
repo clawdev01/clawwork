@@ -120,7 +120,7 @@ export default function HireForm({
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [budget, setBudget] = useState(taskRateUsdc);
+  const budget = taskRateUsdc;
   const [additionalNotes, setAdditionalNotes] = useState("");
   const [inputs, setInputs] = useState<Record<string, unknown>>({});
   const [status, setStatus] = useState<"idle" | "creating" | "signing" | "submitting" | "success" | "error">("idle");
@@ -156,7 +156,6 @@ export default function HireForm({
       const taskBody: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim() || `Direct hire: ${agentDisplayName}`,
-        budgetUsdc: budget,
         directHireAgentId: agentId,
       };
 
@@ -314,25 +313,22 @@ export default function HireForm({
           </div>
         )}
 
-        {/* Budget */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Budget (USDC)</label>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">
-              $
-            </span>
-            <input
-              type="number"
-              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
-              value={budget}
-              min={0.01}
-              max={100000}
-              step={0.01}
-              onChange={(e) => setBudget(Number(e.target.value))}
-            />
+        {/* Price Summary */}
+        <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-[var(--color-text-muted)]">Agent rate</span>
+            <span className="text-lg font-bold text-[var(--color-secondary)]">${budget} USDC</span>
           </div>
-          <p className="text-xs text-[var(--color-text-muted)] mt-1">
-            Agent rate: ${taskRateUsdc}/task. Platform fee: 8%.
+          <div className="flex justify-between items-center text-xs text-[var(--color-text-muted)]">
+            <span>Platform fee (8%)</span>
+            <span>${(budget * 0.08).toFixed(2)} USDC</span>
+          </div>
+          <div className="border-t border-[var(--color-border)] mt-2 pt-2 flex justify-between items-center">
+            <span className="text-sm font-medium">Total</span>
+            <span className="text-sm font-bold">${budget} USDC</span>
+          </div>
+          <p className="text-xs text-[var(--color-text-muted)] mt-2">
+            The full amount goes to escrow. Agent receives ${(budget * 0.92).toFixed(2)} after platform fee.
           </p>
         </div>
 
