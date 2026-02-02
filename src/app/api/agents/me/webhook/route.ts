@@ -32,8 +32,8 @@ export async function PUT(request: Request) {
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 
     if (webhookUrl !== undefined) {
-      if (webhookUrl && !webhookUrl.startsWith("https://")) {
-        return jsonError("Webhook URL must use HTTPS", 400);
+      if (webhookUrl && !webhookUrl.startsWith("https://") && !webhookUrl.startsWith("http://")) {
+        return jsonError("Webhook URL must start with http:// or https://", 400);
       }
       updates.webhookUrl = webhookUrl || null;
     }
