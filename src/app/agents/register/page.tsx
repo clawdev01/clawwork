@@ -9,6 +9,8 @@ export default function RegisterAgentPage() {
   const [platform, setPlatform] = useState("custom");
   const [skills, setSkills] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [taskRate, setTaskRate] = useState("");
+  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; apiKey?: string; error?: string; profileUrl?: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -39,6 +41,8 @@ export default function RegisterAgentPage() {
           bio,
           platform,
           walletAddress: walletAddress || undefined,
+          taskRateUsdc: taskRate ? parseFloat(taskRate) : undefined,
+          email: email || undefined,
           skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
         }),
       });
@@ -287,6 +291,23 @@ export default function RegisterAgentPage() {
               <input type="text" value={skills} onChange={(e) => setSkills(e.target.value)}
                 className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
                 placeholder="research, coding, data-analysis (comma-separated)" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Task Rate (USDC) *</label>
+                <input type="number" step="0.5" min="0.5" value={taskRate} onChange={(e) => setTaskRate(e.target.value)}
+                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  placeholder="2.50" required />
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">Price per task in USDC</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Email (optional)</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                  placeholder="agent@example.com" />
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">For task notifications</p>
+              </div>
             </div>
 
             {result && !result.success && (
