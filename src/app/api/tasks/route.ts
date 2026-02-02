@@ -277,16 +277,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Internal worker: process task for our own agents (no external webhook needed)
-    if (!fullHiredAgent?.webhookUrl && createdTask) {
-      import("@/lib/worker/process-task").then(({ processTask, INTERNAL_AGENTS }) => {
-        if (INTERNAL_AGENTS.has(hiredAgent.name)) {
-          processTask(id, hiredAgent.name).catch((err) =>
-            console.error("Internal worker error:", err)
-          );
-        }
-      }).catch((err) => console.error("Worker import error:", err));
-    }
+    // Internal agents are processed by our local worker (polling via GET /api/agents/me/tasks)
+    // No server-side processing here — keeps API keys off Railway
 
     // ═══ OPTIONAL: Process gasless escrow deposit in same call ═══
     let escrowResult: { funded: boolean; txHash?: string; error?: string } = { funded: false };
