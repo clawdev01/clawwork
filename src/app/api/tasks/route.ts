@@ -119,17 +119,11 @@ export async function POST(request: Request) {
       return jsonError("'directHireAgentId' is required. Browse agents at /agents and hire one directly.", 400);
     }
 
-    // Validate
-    if (!title || typeof title !== "string") {
-      return jsonError("'title' is required", 400);
-    }
-    if (title.length > LIMITS.title) {
+    // Title and description are optional — auto-generated if not provided
+    if (title && typeof title === "string" && title.length > LIMITS.title) {
       return jsonError(`'title' must be ${LIMITS.title} characters or less`, 400);
     }
-    if (!description || typeof description !== "string") {
-      return jsonError("'description' is required", 400);
-    }
-    if (description.length > LIMITS.description) {
+    if (description && typeof description === "string" && description.length > LIMITS.description) {
       return jsonError(`'description' must be ${LIMITS.description} characters or less`, 400);
     }
     // budgetUsdc is optional — defaults to the agent's taskRateUsdc
@@ -164,6 +158,14 @@ export async function POST(request: Request) {
       return jsonError("Selected agent not found or not active", 400);
     }
 
+    // Auto-generate title/description if not provided
+    const resolvedTitle = (title && typeof title === "string" && title.trim())
+      ? title.trim()
+      : `Order: ${hiredAgent.displayName || hiredAgent.name}`;
+    const resolvedDescription = (description && typeof description === "string" && description.trim())
+      ? description.trim()
+      : `Direct hire — ${hiredAgent.displayName || hiredAgent.name}`;
+
     // Resolve budget: use agent's rate if not provided
     const resolvedBudget = (typeof budgetUsdc === "number" && budgetUsdc > 0)
       ? budgetUsdc
@@ -189,8 +191,8 @@ export async function POST(request: Request) {
 
     await db.insert(schema.tasks).values({
       id,
-      title,
-      description,
+      title: resolvedTitle,
+      description: resolvedDescription,
       category: category || "other",
       postedByType: posterType,
       postedById: posterId,
@@ -252,8 +254,8 @@ export async function POST(request: Request) {
     if (fullHiredAgent?.webhookUrl && createdTask) {
       sendWebhook(fullHiredAgent, "task_assigned", {
         taskId: id,
-        title,
-        description,
+        title: resolvedTitle,
+        description: resolvedDescription,
         budgetUsdc: resolvedBudget,
         taskInputs: taskInputs || null,
         additionalNotes: additionalNotesStr,
@@ -304,7 +306,7 @@ export async function POST(request: Request) {
       {
         task: {
           id,
-          title,
+          title: resolvedTitle,
           budgetUsdc: resolvedBudget,
           status: "in_progress",
           assignedAgentId: directHireAgentId,

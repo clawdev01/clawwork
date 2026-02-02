@@ -118,7 +118,6 @@ export default function HireForm({
   const { address, isConnected } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
 
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const budget = taskRateUsdc;
   const [additionalNotes, setAdditionalNotes] = useState("");
@@ -139,12 +138,8 @@ export default function HireForm({
       return;
     }
 
-    if (!title.trim()) {
-      setError("Please enter an order title");
-      return;
-    }
-
-    if (!description.trim() && !inputSchema) {
+    // Need either schema inputs or a description
+    if (!inputSchema && !description.trim()) {
       setError("Please describe what you need");
       return;
     }
@@ -154,10 +149,12 @@ export default function HireForm({
 
       // Create the task
       const taskBody: Record<string, unknown> = {
-        title: title.trim(),
-        description: description.trim() || `Direct hire: ${agentDisplayName}`,
         directHireAgentId: agentId,
       };
+
+      if (description.trim()) {
+        taskBody.description = description.trim();
+      }
 
       if (inputSchema && Object.keys(inputs).length > 0) {
         taskBody.taskInputs = inputs;
@@ -241,20 +238,7 @@ export default function HireForm({
   return (
     <form onSubmit={handleSubmit}>
       <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 space-y-6">
-        <h2 className="text-xl font-bold">Order Details</h2>
-
-        {/* Title */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Order Title</label>
-          <input
-            type="text"
-            className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors"
-            placeholder={`e.g. "${agentDisplayName}: Research AI trends"`}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={200}
-          />
-        </div>
+        <h2 className="text-xl font-bold">What do you need?</h2>
 
         {/* Dynamic Schema Fields */}
         {hasSchema && (
@@ -281,37 +265,35 @@ export default function HireForm({
           </div>
         )}
 
-        {/* Free-form description (always shown but more prominent when no schema) */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            {hasSchema ? "Description (optional context)" : "Describe what you need"}
-          </label>
-          <textarea
-            className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors min-h-[120px] resize-y"
-            placeholder={
-              hasSchema
-                ? "Any additional context for the agent..."
-                : "Describe the work you need done in detail..."
-            }
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            maxLength={10000}
-          />
-        </div>
-
-        {/* Additional Notes */}
-        {(inputSchema?.additionalNotes || !hasSchema) && (
+        {/* Free-form description — only when agent has no input schema */}
+        {!hasSchema && (
           <div>
-            <label className="block text-sm font-medium mb-2">Additional Notes</label>
+            <label className="block text-sm font-medium mb-2">
+              Describe what you need
+            </label>
             <textarea
-              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors min-h-[80px] resize-y"
-              placeholder="Any special instructions, preferences, or constraints..."
-              value={additionalNotes}
-              onChange={(e) => setAdditionalNotes(e.target.value)}
-              maxLength={5000}
+              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors min-h-[120px] resize-y"
+              placeholder="Describe the work you need done in detail..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={10000}
             />
           </div>
         )}
+
+        {/* Additional Notes — always available, always optional */}
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Additional Notes <span className="text-[var(--color-text-muted)] font-normal">(optional)</span>
+          </label>
+          <textarea
+            className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-secondary)] transition-colors min-h-[80px] resize-y"
+            placeholder="Any special instructions, preferences, or constraints..."
+            value={additionalNotes}
+            onChange={(e) => setAdditionalNotes(e.target.value)}
+            maxLength={5000}
+          />
+        </div>
 
         {/* Price Summary */}
         <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl p-4">
