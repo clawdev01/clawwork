@@ -7,10 +7,6 @@
 
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
-import { execSync } from "child_process";
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -29,18 +25,22 @@ async function handleProductShotPro(taskId: string, inputs: TaskInputs, notes: s
     return JSON.stringify({ error: "No product photo provided. Please include a product photo URL." });
   }
 
-  // Download input image
-  const tmpDir = `/tmp/worker-${crypto.randomUUID()}`;
-  fs.mkdirSync(tmpDir, { recursive: true });
-  const inputPath = path.join(tmpDir, "input.png");
-  const outputPath = path.join(tmpDir, "output.png");
+  if (!GEMINI_API_KEY) {
+    return JSON.stringify({ error: "Image processing unavailable — GEMINI_API_KEY not configured." });
+  }
 
+  // Download input image and convert to base64
+  let imageBase64: string;
+  let mimeType = "image/png";
   try {
     const res = await fetch(photoUrl);
     if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-    fs.writeFileSync(inputPath, Buffer.from(await res.arrayBuffer()));
+    const contentType = res.headers.get("content-type") || "image/png";
+    if (contentType.includes("jpeg") || contentType.includes("jpg")) mimeType = "image/jpeg";
+    else if (contentType.includes("webp")) mimeType = "image/webp";
+    const buf = Buffer.from(await res.arrayBuffer());
+    imageBase64 = buf.toString("base64");
   } catch (e: any) {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
     return JSON.stringify({ error: `Could not download image: ${e.message}` });
   }
 
@@ -57,22 +57,56 @@ async function handleProductShotPro(taskId: string, inputs: TaskInputs, notes: s
   const fullPrompt = `Remove the background from this product photo and replace with a professional product photography setup. ${basePrompt} Style: ${style}. Keep the product EXACTLY as it is — same shape, color, details. Only change the background and lighting.`;
 
   try {
-    const scriptPath = "/usr/lib/node_modules/openclaw/skills/nano-banana-pro/scripts/generate_image.py";
-    const cmd = `GEMINI_API_KEY="${GEMINI_API_KEY}" uv run ${scriptPath} --prompt "${fullPrompt.replace(/"/g, '\\"')}" -i "${inputPath}" --filename "${outputPath}" --resolution 1K 2>&1`;
-    execSync(cmd, { timeout: 120000 });
+    // Use Gemini API directly via HTTP (no Python dependency)
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`;
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            { text: fullPrompt },
+          ],
+        }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+          temperature: 0.4,
+        },
+      }),
+    });
 
-    const outputData = fs.readFileSync(outputPath);
-    const base64 = outputData.toString("base64");
+    const data = await res.json();
 
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (!res.ok) {
+      const errMsg = data?.error?.message || JSON.stringify(data).slice(0, 200);
+      throw new Error(`Gemini API error: ${errMsg}`);
+    }
+
+    // Extract image from response
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    let outputBase64 = "";
+    let responseText = "";
+
+    for (const part of parts) {
+      if (part.text) responseText = part.text;
+      if (part.inlineData?.data) {
+        outputBase64 = part.inlineData.data;
+      }
+    }
+
+    if (!outputBase64) {
+      return JSON.stringify({
+        error: `Image generation failed — no image in response. ${responseText ? `Model said: ${responseText}` : ""}`,
+      });
+    }
 
     return JSON.stringify({
       text: `Professional ${platform} product shot created with ${style} style.`,
-      images: [`data:image/png;base64,${base64}`],
+      images: [`data:image/png;base64,${outputBase64}`],
     });
   } catch (e: any) {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-    return JSON.stringify({ error: `Image processing failed: ${e.message?.slice(0, 200)}` });
+    return JSON.stringify({ error: `Image processing failed: ${e.message?.slice(0, 300)}` });
   }
 }
 
