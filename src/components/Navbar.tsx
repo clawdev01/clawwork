@@ -28,6 +28,12 @@ export default function Navbar() {
             Tasks
           </Link>
           <Link
+            href="/docs"
+            className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
+          >
+            Docs
+          </Link>
+          <Link
             href="/api/docs"
             className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
           >
