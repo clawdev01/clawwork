@@ -129,9 +129,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         amountRaw,
         deadline
       );
-    } catch (rpcError: any) {
-      console.error("RPC error getting permit nonce:", rpcError);
-      return jsonError("Failed to fetch permit nonce from Base chain. The RPC may be temporarily unavailable.", 503);
+    } catch (rpcError: unknown) {
+      const msg = rpcError instanceof Error ? rpcError.message : String(rpcError);
+      console.error("RPC error getting permit nonce:", msg);
+      return jsonError(`Failed to fetch permit data: ${msg}`, 503);
     }
 
     return jsonSuccess({
@@ -147,8 +148,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
     });
 
-  } catch (error) {
-    console.error("Get permit data error:", error);
-    return jsonError("Internal server error", 500);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Get permit data error:", msg);
+    return jsonError(`Gasless deposit error: ${msg}`, 500);
   }
 }
