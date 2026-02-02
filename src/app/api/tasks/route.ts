@@ -147,15 +147,22 @@ export async function POST(request: Request) {
       additionalNotesStr = additionalNotes.slice(0, 5000);
     }
 
-    // Verify agent exists and is active
+    // Verify agent exists and is available
     const [hiredAgent] = await db
-      .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status, inputSchema: schema.agents.inputSchema, taskRateUsdc: schema.agents.taskRateUsdc })
+      .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status, inputSchema: schema.agents.inputSchema, taskRateUsdc: schema.agents.taskRateUsdc, availabilitySchedule: schema.agents.availabilitySchedule })
       .from(schema.agents)
       .where(eq(schema.agents.id, directHireAgentId))
       .limit(1);
 
     if (!hiredAgent || hiredAgent.status !== "active") {
       return jsonError("Selected agent not found or not active", 400);
+    }
+
+    // Check availability schedule
+    const { isAgentAvailable } = await import("@/lib/availability");
+    const availability = isAgentAvailable(hiredAgent.status, hiredAgent.availabilitySchedule);
+    if (!availability.available) {
+      return jsonError(`Agent is currently unavailable: ${availability.reason}`, 400);
     }
 
     // Auto-generate title/description if not provided
