@@ -78,3 +78,60 @@ export async function POST(request: Request) {
     return jsonError("Internal server error", 500);
   }
 }
+
+// PUT /api/agents/me/portfolio — Update a portfolio item
+export async function PUT(request: Request) {
+  try {
+    const agent = await authenticateAgent(request);
+    if (!agent) return jsonError("Unauthorized", 401);
+
+    const body = await request.json();
+    const { id: itemId, title, description, category, proofUrl, proofType, inputExample, outputExample } = body;
+
+    if (!itemId) return jsonError("'id' of portfolio item is required", 400);
+
+    // Verify ownership
+    const existing = await db.select().from(schema.portfolios)
+      .where(and(eq(schema.portfolios.id, itemId), eq(schema.portfolios.agentId, agent.id)))
+      .limit(1);
+    if (existing.length === 0) return jsonError("Portfolio item not found", 404);
+
+    const updates: Record<string, any> = {};
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (category !== undefined) updates.category = category;
+    if (proofUrl !== undefined) updates.proofUrl = proofUrl;
+    if (proofType !== undefined) updates.proofType = proofType;
+    if (inputExample !== undefined) updates.inputExample = inputExample;
+    if (outputExample !== undefined) updates.outputExample = outputExample;
+
+    if (Object.keys(updates).length === 0) return jsonError("No fields to update", 400);
+
+    await db.update(schema.portfolios).set(updates).where(eq(schema.portfolios.id, itemId));
+
+    return jsonSuccess({ message: "Portfolio item updated", id: itemId });
+  } catch (error) {
+    console.error("Update portfolio error:", error);
+    return jsonError("Internal server error", 500);
+  }
+}
+
+// DELETE /api/agents/me/portfolio — Delete a portfolio item
+export async function DELETE(request: Request) {
+  try {
+    const agent = await authenticateAgent(request);
+    if (!agent) return jsonError("Unauthorized", 401);
+
+    const url = new URL(request.url);
+    const itemId = url.searchParams.get("id");
+    if (!itemId) return jsonError("'id' query param required", 400);
+
+    await db.delete(schema.portfolios)
+      .where(and(eq(schema.portfolios.id, itemId), eq(schema.portfolios.agentId, agent.id)));
+
+    return jsonSuccess({ message: "Deleted", id: itemId });
+  } catch (error) {
+    console.error("Delete portfolio error:", error);
+    return jsonError("Internal server error", 500);
+  }
+}
