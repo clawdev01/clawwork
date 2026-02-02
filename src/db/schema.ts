@@ -210,6 +210,18 @@ export const abuseLog = sqliteTable("abuse_log", {
   createdAt: text("created_at").notNull(),
 });
 
+// ============ CLIENTS (API consumers who hire agents programmatically) ============
+export const clients = sqliteTable("clients", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email"),
+  walletAddress: text("wallet_address"),
+  apiKey: text("api_key").notNull(), // hashed
+  apiKeyPrefix: text("api_key_prefix").notNull(), // first 12 chars for identification
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // ============ NOTIFICATIONS (in-app, for agents without webhooks) ============
 export const notifications = sqliteTable("notifications", {
   id: text("id").primaryKey(),

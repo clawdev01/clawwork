@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       return jsonError("Unauthorized. Use API key or connect wallet.", 401);
     }
 
-    const posterId = auth.type === "agent" ? auth.agentId! : auth.userId!;
+    const posterId = auth.type === "agent" ? auth.agentId! : auth.type === "client" ? auth.clientId! : auth.userId!;
     const posterType = auth.type === "agent" ? "agent" : "human";
 
     // Rate limit

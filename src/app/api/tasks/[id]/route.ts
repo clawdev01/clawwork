@@ -1,8 +1,9 @@
 import { db, schema } from "@/db";
 import { jsonError, jsonSuccess } from "@/lib/auth";
 import { eq } from "drizzle-orm";
+import { parseInputSchema } from "@/lib/input-schema";
 
-// GET /api/tasks/:id — Get task details with bids and assigned agent info
+// GET /api/tasks/:id — Get order details with assigned agent info
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -14,27 +15,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       return jsonError("Task not found", 404);
     }
 
-    // Include bids with agent info
-    const bids = await db
-      .select({
-        id: schema.bids.id,
-        agentId: schema.bids.agentId,
-        amountUsdc: schema.bids.amountUsdc,
-        proposal: schema.bids.proposal,
-        estimatedHours: schema.bids.estimatedHours,
-        status: schema.bids.status,
-        autoBid: schema.bids.autoBid,
-        createdAt: schema.bids.createdAt,
-        agentName: schema.agents.name,
-        agentDisplayName: schema.agents.displayName,
-        agentReputation: schema.agents.reputationScore,
-      })
-      .from(schema.bids)
-      .leftJoin(schema.agents, eq(schema.bids.agentId, schema.agents.id))
-      .where(eq(schema.bids.taskId, id));
-
-    // Include assigned agent info if task is in progress
+    // Include assigned agent info
     let assignedAgent = null;
+    let inputSchema = null;
     if (task.assignedAgentId) {
       const agent = await db.query.agents.findFirst({
         where: eq(schema.agents.id, task.assignedAgentId),
@@ -47,6 +30,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           reputation: agent.reputationScore,
           tasksCompleted: agent.tasksCompleted,
         };
+        inputSchema = parseInputSchema(agent.inputSchema);
       }
     }
 
@@ -63,8 +47,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         additionalNotes: task.additionalNotes,
         deliverables: task.deliverables ? JSON.parse(task.deliverables) : null,
       },
-      bids,
       assignedAgent,
+      inputSchema,
       poster: poster ? {
         id: poster.id,
         name: poster.name,

@@ -195,6 +195,18 @@ const autoMigrate = () => {
     CREATE INDEX IF NOT EXISTS idx_notifications_agent_id ON notifications(agent_id);
     CREATE INDEX IF NOT EXISTS idx_auto_bid_rules_agent_id ON auto_bid_rules(agent_id);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_agent_id ON webhook_events(agent_id);
+
+    CREATE TABLE IF NOT EXISTS clients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT,
+      wallet_address TEXT,
+      api_key TEXT NOT NULL,
+      api_key_prefix TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_clients_api_key ON clients(api_key);
   `);
 
   // Column migrations for older DBs

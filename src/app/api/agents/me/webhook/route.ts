@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   return jsonSuccess({
     webhookUrl: agent.webhookUrl || null,
     hasSecret: !!agent.webhookSecret,
-    events: ["task_match", "bid_accepted", "bid_rejected", "task_assigned", "payment_received"],
+    events: ["task_assigned", "task_delivered", "payment_received"],
   });
 }
 
