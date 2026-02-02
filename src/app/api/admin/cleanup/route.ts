@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { db, schema } from "@/db";
 import { jsonError, jsonSuccess } from "@/lib/auth";
 import { eq } from "drizzle-orm";

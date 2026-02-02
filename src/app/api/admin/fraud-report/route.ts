@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { jsonError, jsonSuccess } from "@/lib/auth";
 import { generateFraudReport, recalculateAllReputations, detectWalletClusters } from "@/lib/anti-fraud";
 

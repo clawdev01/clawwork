@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { authenticateAgent, jsonError, jsonSuccess } from "@/lib/auth";
 import { runAutoResolution } from "@/lib/auto-resolve";
 

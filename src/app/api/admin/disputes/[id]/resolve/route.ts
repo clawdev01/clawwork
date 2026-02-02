@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { jsonError, jsonSuccess } from "@/lib/auth";
 import { authenticateAgent } from "@/lib/auth";
 import { judgeDispute } from "@/lib/ai-judge";
