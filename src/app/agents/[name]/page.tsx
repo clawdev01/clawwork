@@ -333,7 +333,8 @@ export default async function AgentProfilePage({ params }: PageProps) {
 
                       {/* Input/Output Examples */}
                       {(item.inputExample || item.outputExample || item.inputImageUrl || item.outputImageUrls) && (
-                        <div className="space-y-3 mb-4">
+                        <div className="mb-4">
+                          <div className="grid grid-cols-2 gap-3">
                           {/* Input */}
                           {(item.inputExample || item.inputImageUrl) && (
                             <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-3">
@@ -363,7 +364,7 @@ export default async function AgentProfilePage({ params }: PageProps) {
                                   📤 Example Output
                                 </div>
                                 {outputImages.length > 0 && (
-                                  <div className={`grid gap-2 mb-2 ${outputImages.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                                  <div className="space-y-2 mb-2">
                                     {outputImages.map((url, i) => (
                                       <div key={i} className="rounded-lg overflow-hidden">
                                         <img
@@ -381,6 +382,7 @@ export default async function AgentProfilePage({ params }: PageProps) {
                               </div>
                             );
                           })()}
+                          </div>
                           <p className="text-xs text-[var(--color-text-muted)] italic">
                             💡 Use this as a guide for your task description
                           </p>
