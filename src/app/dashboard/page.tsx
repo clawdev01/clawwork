@@ -48,16 +48,6 @@ interface DashboardData {
     deadline: string | null;
     updatedAt: string;
   }>;
-  recentBids: Array<{
-    id: string;
-    taskId: string;
-    taskTitle: string;
-    taskStatus: string;
-    amountUsdc: number;
-    status: string;
-    autoBid: number;
-    createdAt: string;
-  }>;
   earningsSummary: Array<{
     taskId: string;
     title: string;
@@ -73,18 +63,6 @@ interface DashboardData {
     createdAt: string;
   }>;
   unreadCount: number;
-  autoBidRules: Array<{
-    id: string;
-    name: string;
-    enabled: number;
-    categories: string[];
-    skills: string[];
-    bidStrategy: string;
-    minBudgetUsdc: number | null;
-    maxBudgetUsdc: number | null;
-    totalBidsPlaced: number;
-    totalBidsAccepted: number;
-  }>;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -144,10 +122,10 @@ function AvailabilityToggle({
     ? `Finishing ${activeTasks} active task${activeTasks !== 1 ? "s" : ""}... will pause automatically`
     : "Your agent is paused";
   const statusDesc = isActive
-    ? "Visible in search · Eligible for auto-matching · Accepting bids"
+    ? "Visible in search · Accepting new orders"
     : isDraining
-    ? "Hidden from search · No new tasks · Completing current work"
-    : "Hidden from search · Not receiving new tasks";
+    ? "Hidden from search · No new orders · Completing current work"
+    : "Hidden from search · Not receiving new orders";
 
   const buttonLabel = isActive
     ? "Pause After Current Tasks"
@@ -214,15 +192,6 @@ function EarningsChart({ earnings }: { earnings: DashboardData["earningsSummary"
       ))}
     </div>
   );
-}
-
-function bidStatusColor(status: string) {
-  switch (status) {
-    case "accepted": return "text-[var(--color-secondary)]";
-    case "rejected": return "text-[var(--color-primary)]";
-    case "withdrawn": return "text-[var(--color-text-muted)]";
-    default: return "text-[var(--color-accent)]";
-  }
 }
 
 export default function DashboardPage() {
@@ -406,7 +375,7 @@ export default function DashboardPage() {
 
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Posted Tasks" value={String(humanData.postedTasks.length)} />
+            <StatCard label="My Orders" value={String(humanData.postedTasks.length)} />
             <StatCard label="Owned Agents" value={String(humanData.ownedAgents.length)} />
             <WalletBalance />
           </div>
@@ -415,11 +384,11 @@ export default function DashboardPage() {
             {/* Tasks */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">My Tasks</h2>
-                <Link href="/tasks/new" className="text-sm text-[var(--color-secondary)] hover:underline">+ Post Task</Link>
+                <h2 className="text-xl font-bold">My Orders</h2>
+                <Link href="/agents" className="text-sm text-[var(--color-secondary)] hover:underline">+ Hire Agent</Link>
               </div>
               {humanData.postedTasks.length === 0 ? (
-                <p className="text-[var(--color-text-muted)] text-center py-6">No tasks posted yet</p>
+                <p className="text-[var(--color-text-muted)] text-center py-6">No orders yet — browse agents to get started</p>
               ) : (
                 <div className="space-y-3">
                   {humanData.postedTasks.slice(0, 10).map((task) => (
@@ -488,23 +457,22 @@ export default function DashboardPage() {
         />
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Reputation" value={`${data.stats.reputationScore}/100`} />
           <StatCard label="Completed" value={String(data.stats.tasksCompleted)} />
           <StatCard label="Earned" value={`$${data.stats.totalEarnedUsdc?.toFixed(2) || "0.00"}`} accent />
-          <StatCard label="Active Tasks" value={String(data.stats.activeTasks)} accent />
-          <StatCard label="Pending Bids" value={String(data.stats.pendingBids)} />
+          <StatCard label="Active Orders" value={String(data.stats.activeTasks)} accent />
           <WalletBalance />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Column */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Active Tasks */}
+            {/* Active Orders */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
-              <h2 className="text-xl font-bold mb-4">Active Tasks</h2>
+              <h2 className="text-xl font-bold mb-4">Active Orders</h2>
               {data.activeTasks.length === 0 ? (
-                <p className="text-[var(--color-text-muted)] text-center py-6">No active tasks</p>
+                <p className="text-[var(--color-text-muted)] text-center py-6">No active orders</p>
               ) : (
                 <div className="space-y-3">
                   {data.activeTasks.map((task) => (
@@ -525,37 +493,6 @@ export default function DashboardPage() {
                         <span className="text-[var(--color-secondary)] font-bold">${task.budgetUsdc.toFixed(2)}</span>
                       </div>
                     </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Bid History */}
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
-              <h2 className="text-xl font-bold mb-4">Recent Bids</h2>
-              {data.recentBids.length === 0 ? (
-                <p className="text-[var(--color-text-muted)] text-center py-6">No bids placed yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {data.recentBids.map((bid) => (
-                    <div
-                      key={bid.id}
-                      className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-xl p-4"
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="font-medium text-sm">{bid.taskTitle}</div>
-                        <span className="font-bold">${bid.amountUsdc.toFixed(2)}</span>
-                      </div>
-                      <div className="flex gap-3 text-xs">
-                        <span className={bidStatusColor(bid.status)}>{bid.status}</span>
-                        {bid.autoBid ? (
-                          <span className="text-[var(--color-accent)]">⚡ auto-bid</span>
-                        ) : null}
-                        <span className="text-[var(--color-text-muted)]">
-                          {new Date(bid.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
                   ))}
                 </div>
               )}
@@ -596,44 +533,6 @@ export default function DashboardPage() {
                       <div className="text-[var(--color-text-muted)] text-[10px] mt-1">
                         {new Date(notif.createdAt).toLocaleString()}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Auto-Bid Rules */}
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
-              <h3 className="font-semibold mb-4">Auto-Bid Rules</h3>
-              {data.autoBidRules.length === 0 ? (
-                <p className="text-[var(--color-text-muted)] text-sm text-center py-4">No auto-bid rules configured</p>
-              ) : (
-                <div className="space-y-3">
-                  {data.autoBidRules.map((rule) => (
-                    <div
-                      key={rule.id}
-                      className="bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded-lg p-3"
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-medium text-sm">{rule.name || "Unnamed Rule"}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          rule.enabled ? "bg-[var(--color-secondary)]/15 text-[var(--color-secondary)]" : "bg-[var(--color-border)] text-[var(--color-text-muted)]"
-                        }`}>
-                          {rule.enabled ? "Active" : "Paused"}
-                        </span>
-                      </div>
-                      <div className="text-xs text-[var(--color-text-muted)]">
-                        {rule.bidStrategy} · {rule.totalBidsPlaced} bids · {rule.totalBidsAccepted} accepted
-                      </div>
-                      {rule.skills.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {rule.skills.map((s) => (
-                            <span key={s} className="text-[10px] bg-[var(--color-surface)] px-1.5 py-0.5 rounded border border-[var(--color-border)]">
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>

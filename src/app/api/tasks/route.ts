@@ -1,15 +1,15 @@
 import { db, schema } from "@/db";
-import { authenticateAgent, jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
+import { jsonError, jsonSuccess, LIMITS } from "@/lib/auth";
 import { authenticate } from "@/lib/unified-auth";
-import { checkRateLimit, getClientId, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
-import { processNewTask, sendWebhook, createNotification } from "@/lib/matching";
+import { checkRateLimit, rateLimitError, RATE_LIMITS } from "@/lib/rate-limit";
+import { sendWebhook, createNotification } from "@/lib/matching";
 import { validateTaskInputs } from "@/lib/input-schema";
 import { isPlatformWalletConfigured } from "@/lib/crypto";
 import { processGaslessDeposit } from "@/lib/payments";
 import { v4 as uuid } from "uuid";
-import { eq, desc, asc, and, like, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, asc, and, gte, lte, sql } from "drizzle-orm";
 
-// GET /api/tasks - List open tasks with search/filter/sort
+// GET /api/tasks - List orders with search/filter/sort
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/tasks - Create a new task
+// POST /api/tasks - Create a new order (direct hire only)
 export async function POST(request: Request) {
   try {
     // Unified auth: API key (agent) or SIWE session (human)
@@ -105,12 +105,7 @@ export async function POST(request: Request) {
       budgetUsdc,
       deadline,
       requiredSkills,
-      // Auto-accept settings
-      autoAccept,
-      autoAcceptMinReputation,
-      autoAcceptMaxBudget,
-      autoAcceptPreferredSkills,
-      // Direct hire
+      // Direct hire (REQUIRED)
       directHireAgentId,
       // Structured inputs
       taskInputs,
@@ -118,6 +113,11 @@ export async function POST(request: Request) {
       // Optional: gasless escrow permit (create + fund in one call)
       permit,
     } = body;
+
+    // Direct hire is required — every order must target a specific agent
+    if (!directHireAgentId || typeof directHireAgentId !== "string") {
+      return jsonError("'directHireAgentId' is required. Browse agents at /agents and hire one directly.", 400);
+    }
 
     // Validate
     if (!title || typeof title !== "string") {
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
       return jsonError("'budgetUsdc' must be 100,000 or less", 400);
     }
 
-    // Validate taskInputs against agent's inputSchema if direct hiring
+    // Validate taskInputs against agent's inputSchema
     let taskInputsJson: string | null = null;
     let additionalNotesStr: string | null = null;
 
@@ -157,19 +157,22 @@ export async function POST(request: Request) {
       additionalNotesStr = additionalNotes.slice(0, 5000);
     }
 
-    if (directHireAgentId && taskInputs) {
-      // Fetch agent's input schema for validation
-      const [targetAgent] = await db
-        .select({ inputSchema: schema.agents.inputSchema })
-        .from(schema.agents)
-        .where(eq(schema.agents.id, directHireAgentId))
-        .limit(1);
+    // Verify agent exists and is active
+    const [hiredAgent] = await db
+      .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status, inputSchema: schema.agents.inputSchema })
+      .from(schema.agents)
+      .where(eq(schema.agents.id, directHireAgentId))
+      .limit(1);
 
-      if (targetAgent?.inputSchema) {
-        const inputError = validateTaskInputs(taskInputs, targetAgent.inputSchema);
-        if (inputError) {
-          return jsonError(`Task input validation failed: ${inputError}`, 400);
-        }
+    if (!hiredAgent || hiredAgent.status !== "active") {
+      return jsonError("Selected agent not found or not active", 400);
+    }
+
+    // Validate taskInputs against agent's inputSchema
+    if (taskInputs && hiredAgent.inputSchema) {
+      const inputError = validateTaskInputs(taskInputs, hiredAgent.inputSchema);
+      if (inputError) {
+        return jsonError(`Task input validation failed: ${inputError}`, 400);
       }
     }
 
@@ -188,193 +191,129 @@ export async function POST(request: Request) {
       requiredSkills: JSON.stringify(requiredSkills || []),
       taskInputs: taskInputsJson,
       additionalNotes: additionalNotesStr,
-      autoAccept: autoAccept ? 1 : 0,
-      autoAcceptMinReputation: autoAcceptMinReputation || null,
-      autoAcceptMaxBudget: autoAcceptMaxBudget || null,
-      autoAcceptPreferredSkills: autoAcceptPreferredSkills ? JSON.stringify(autoAcceptPreferredSkills) : null,
+      autoAccept: 1,
       createdAt: now,
       updatedAt: now,
     });
 
-    // ═══ DIRECT HIRE: skip matching, auto-assign agent ═══
-    if (directHireAgentId) {
-      // Get poster agent for wallet address (needed for escrow)
-      const posterAgent = auth.type === "agent"
-        ? await db.query.agents.findFirst({ where: eq(schema.agents.id, posterId) })
-        : null;
+    // Get poster agent for wallet address (needed for escrow)
+    const posterAgent = auth.type === "agent"
+      ? await db.query.agents.findFirst({ where: eq(schema.agents.id, posterId) })
+      : null;
 
-      // Verify agent exists and is active
-      const [hiredAgent] = await db
-        .select({ id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName, status: schema.agents.status })
-        .from(schema.agents)
-        .where(eq(schema.agents.id, directHireAgentId))
-        .limit(1);
+    const bidId = uuid();
+    const bidNow = new Date().toISOString();
 
-      if (!hiredAgent || hiredAgent.status !== "active") {
-        // Clean up the task we just created
-        await db.delete(schema.tasks).where(eq(schema.tasks.id, id));
-        return jsonError("Selected agent not found or not active", 400);
-      }
+    // Create an auto-bid from the hired agent (internal bookkeeping)
+    await db.insert(schema.bids).values({
+      id: bidId,
+      taskId: id,
+      agentId: directHireAgentId,
+      amountUsdc: budgetUsdc,
+      proposal: "Direct hire — selected by customer.",
+      estimatedHours: null,
+      status: "accepted",
+      autoBid: 1,
+      createdAt: bidNow,
+    });
 
-      const bidId = uuid();
-      const bidNow = new Date().toISOString();
+    // Update task to in_progress with assigned agent
+    await db
+      .update(schema.tasks)
+      .set({
+        status: "in_progress",
+        assignedAgentId: directHireAgentId,
+        bidCount: 1,
+        updatedAt: bidNow,
+      })
+      .where(eq(schema.tasks.id, id));
 
-      // Create an auto-bid from the hired agent
-      await db.insert(schema.bids).values({
-        id: bidId,
+    // Fetch full hired agent record for webhook
+    const [fullHiredAgent] = await db
+      .select()
+      .from(schema.agents)
+      .where(eq(schema.agents.id, directHireAgentId))
+      .limit(1);
+
+    // Fetch task record for notification helper
+    const createdTask = await db.query.tasks.findFirst({
+      where: eq(schema.tasks.id, id),
+    });
+
+    // Send webhook notification to hired agent
+    if (fullHiredAgent?.webhookUrl && createdTask) {
+      sendWebhook(fullHiredAgent, "task_assigned", {
         taskId: id,
-        agentId: directHireAgentId,
-        amountUsdc: budgetUsdc,
-        proposal: "Direct hire — selected by task poster.",
-        estimatedHours: null,
-        status: "accepted",
-        autoBid: 1,
-        createdAt: bidNow,
-      });
+        title,
+        description,
+        budgetUsdc,
+        taskInputs: taskInputs || null,
+        additionalNotes: additionalNotesStr,
+        directHire: true,
+      }).catch((err) => console.error("Direct hire webhook error:", err));
+    }
 
-      // Update task to in_progress with assigned agent
-      await db
-        .update(schema.tasks)
-        .set({
-          status: "in_progress",
-          assignedAgentId: directHireAgentId,
-          bidCount: 1,
-          updatedAt: bidNow,
-        })
-        .where(eq(schema.tasks.id, id));
-
-      // Fetch full hired agent record for webhook
-      const [fullHiredAgent] = await db
-        .select()
-        .from(schema.agents)
-        .where(eq(schema.agents.id, directHireAgentId))
-        .limit(1);
-
-      // Fetch task record for notification helper
-      const createdTask = await db.query.tasks.findFirst({
-        where: eq(schema.tasks.id, id),
-      });
-
-      // Send webhook notification to hired agent
-      if (fullHiredAgent?.webhookUrl && createdTask) {
-        sendWebhook(fullHiredAgent, "task_assigned", {
-          taskId: id,
-          title,
-          description,
-          budgetUsdc,
-          taskInputs: taskInputs || null,
-          additionalNotes: additionalNotesStr,
-          directHire: true,
-        }).catch((err) => console.error("Direct hire webhook error:", err));
-      }
-
-      // Create in-app notification for hired agent
-      if (createdTask) {
-        createNotification(directHireAgentId, "task_assigned", createdTask).catch((err) =>
-          console.error("Direct hire notification error:", err)
-        );
-      }
-
-      // ═══ OPTIONAL: Process gasless escrow deposit in same call ═══
-      let escrowResult: { funded: boolean; txHash?: string; error?: string } = { funded: false };
-
-      if (permit && typeof permit === "object" && permit.v !== undefined && permit.r && permit.s && permit.deadline) {
-        if (!isPlatformWalletConfigured()) {
-          // Don't fail the task creation — just skip escrow
-          escrowResult = { funded: false, error: "Platform wallet not configured for gasless deposits" };
-        } else if (!posterAgent?.walletAddress) {
-          escrowResult = { funded: false, error: "Agent must have a wallet address for escrow" };
-        } else {
-          try {
-            const depositResult = await processGaslessDeposit({
-              taskId: id,
-              owner: posterAgent.walletAddress,
-              amount: budgetUsdc,
-              deadline: BigInt(permit.deadline),
-              v: Number(permit.v),
-              r: permit.r as `0x${string}`,
-              s: permit.s as `0x${string}`,
-            });
-
-            if (depositResult.success) {
-              escrowResult = { funded: true, txHash: depositResult.transferTxHash };
-            } else {
-              escrowResult = { funded: false, error: depositResult.error };
-            }
-          } catch (err) {
-            escrowResult = { funded: false, error: "Escrow deposit failed" };
-            console.error("Inline escrow deposit error:", err);
-          }
-        }
-      }
-
-      return jsonSuccess(
-        {
-          task: {
-            id,
-            title,
-            budgetUsdc,
-            status: "in_progress",
-            autoAccept: true,
-            assignedAgentId: directHireAgentId,
-            assignedAgent: {
-              id: hiredAgent.id,
-              name: hiredAgent.name,
-              displayName: hiredAgent.displayName,
-            },
-            url: `https://clawwork.io/tasks/${id}`,
-          },
-          escrow: escrowResult,
-          message: escrowResult.funded
-            ? "Task created, agent hired, and escrow funded! Work is starting now."
-            : "Task created and agent hired! Work is starting now. Fund escrow via POST /api/tasks/:id/deposit-gasless",
-        },
-        201
+    // Create in-app notification for hired agent
+    if (createdTask) {
+      createNotification(directHireAgentId, "task_assigned", createdTask).catch((err) =>
+        console.error("Direct hire notification error:", err)
       );
     }
 
-    // 🔥 MATCHING ENGINE: find agents, auto-bid, auto-accept
-    const matchingPromise = processNewTask(id).catch((err) =>
-      console.error("Matching engine error:", err)
-    );
+    // ═══ OPTIONAL: Process gasless escrow deposit in same call ═══
+    let escrowResult: { funded: boolean; txHash?: string; error?: string } = { funded: false };
 
-    const matchResult = await Promise.race([
-      matchingPromise,
-      new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
-    ]);
+    if (permit && typeof permit === "object" && permit.v !== undefined && permit.r && permit.s && permit.deadline) {
+      if (!isPlatformWalletConfigured()) {
+        escrowResult = { funded: false, error: "Platform wallet not configured for gasless deposits" };
+      } else if (!posterAgent?.walletAddress) {
+        escrowResult = { funded: false, error: "Agent must have a wallet address for escrow" };
+      } else {
+        try {
+          const depositResult = await processGaslessDeposit({
+            taskId: id,
+            owner: posterAgent.walletAddress,
+            amount: budgetUsdc,
+            deadline: BigInt(permit.deadline),
+            v: Number(permit.v),
+            r: permit.r as `0x${string}`,
+            s: permit.s as `0x${string}`,
+          });
 
-    const response: Record<string, unknown> = {
-      task: {
-        id,
-        title,
-        budgetUsdc,
-        status: "open",
-        autoAccept: !!autoAccept,
-        url: `https://clawwork.io/tasks/${id}`,
-      },
-    };
-
-    if (matchResult && typeof matchResult === "object") {
-      const mr = matchResult as any;
-      response.matching = {
-        matchedAgents: mr.matchedAgents,
-        autoBidsPlaced: mr.autoBidsPlaced,
-        autoAccepted: mr.autoAccepted,
-        webhooksSent: mr.webhooksSent,
-        notificationsCreated: mr.notificationsCreated,
-      };
-
-      if (mr.autoAccepted) {
-        response.task = {
-          ...(response.task as object),
-          status: "in_progress",
-          assignedAgentId: mr.acceptedAgentId,
-        };
-        response.message = "Task created and auto-matched with an agent! Work is starting now.";
+          if (depositResult.success) {
+            escrowResult = { funded: true, txHash: depositResult.transferTxHash };
+          } else {
+            escrowResult = { funded: false, error: depositResult.error };
+          }
+        } catch (err) {
+          escrowResult = { funded: false, error: "Escrow deposit failed" };
+          console.error("Inline escrow deposit error:", err);
+        }
       }
     }
 
-    return jsonSuccess(response, 201);
+    return jsonSuccess(
+      {
+        task: {
+          id,
+          title,
+          budgetUsdc,
+          status: "in_progress",
+          assignedAgentId: directHireAgentId,
+          assignedAgent: {
+            id: hiredAgent.id,
+            name: hiredAgent.name,
+            displayName: hiredAgent.displayName,
+          },
+          url: `https://clawwork.io/tasks/${id}`,
+        },
+        escrow: escrowResult,
+        message: escrowResult.funded
+          ? "Order created, agent hired, and escrow funded! Work is starting now."
+          : "Order created and agent hired! Work is starting now. Fund escrow via POST /api/tasks/:id/deposit-gasless",
+      },
+      201
+    );
   } catch (error) {
     console.error("Create task error:", error);
     return jsonError("Internal server error", 500);

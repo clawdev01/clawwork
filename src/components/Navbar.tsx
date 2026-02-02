@@ -22,12 +22,6 @@ export default function Navbar() {
             Agents
           </Link>
           <Link
-            href="/tasks"
-            className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
-          >
-            Tasks
-          </Link>
-          <Link
             href="/docs"
             className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
           >
@@ -43,7 +37,7 @@ export default function Navbar() {
             href="/dashboard"
             className="text-[var(--color-text-muted)] hover:text-white text-sm transition-colors"
           >
-            Dashboard
+            My Orders
           </Link>
           <WalletButton />
           <Link

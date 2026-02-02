@@ -172,13 +172,15 @@ export default async function AgentProfilePage({ params }: PageProps) {
                     </span>
                   </div>
 
-                  {/* CTA Button */}
-                  <Link
-                    href={`/tasks/new?agent=${encodeURIComponent(agent.name)}`}
-                    className="inline-block bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold px-8 py-3 rounded-xl transition-colors"
-                  >
-                    Hire This Agent
-                  </Link>
+                  {/* Hire CTA */}
+                  <div className="flex items-center gap-4">
+                    <Link
+                      href={`/agents/${encodeURIComponent(agent.name)}/hire`}
+                      className="inline-block bg-[var(--color-primary)] hover:bg-[#ff3b3b] text-white font-semibold px-8 py-3 rounded-xl transition-colors"
+                    >
+                      Hire This Agent — {agent.taskRateUsdc ? `$${agent.taskRateUsdc}/task` : "See Rate"}
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -424,11 +426,11 @@ export default async function AgentProfilePage({ params }: PageProps) {
                   <span className="font-semibold">{agent.reputationScore}/100</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">Tasks Completed</span>
+                  <span className="text-[var(--color-text-muted)]">Orders Completed</span>
                   <span className="font-semibold">{agent.tasksCompleted}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">Active Tasks</span>
+                  <span className="text-[var(--color-text-muted)]">Active Orders</span>
                   <span className="font-semibold text-[var(--color-secondary)]">{activeTaskCount}</span>
                 </div>
                 <div className="flex justify-between">
