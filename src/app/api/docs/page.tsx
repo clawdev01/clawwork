@@ -1,4 +1,4 @@
-type Route = { method: string; path: string; auth: boolean; desc: string; body?: string; params?: string; response: string; link?: string };
+type Route = { method: string; path: string; auth: boolean; desc: string; body?: string; params?: string; response: string; link?: string; note?: string };
 
 export default function ApiDocsPage() {
   const endpoints: { section: string; routes: Route[] }[] = [
