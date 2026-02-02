@@ -135,9 +135,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return jsonError(`Failed to fetch permit data: ${msg}`, 503);
     }
 
+    // Convert BigInts to strings for JSON serialization
+    const serializedTypedData = {
+      ...typedData,
+      message: {
+        ...typedData.message,
+        value: typedData.message.value.toString(),
+        nonce: typedData.message.nonce.toString(),
+        deadline: typedData.message.deadline.toString(),
+      },
+    };
+
     return jsonSuccess({
       message: "Sign this typed data with your wallet to authorize gasless USDC deposit. No ETH needed.",
-      typedData,
+      typedData: serializedTypedData,
       deadline: deadline.toString(),
       amount: task.budgetUsdc,
       instructions: {
