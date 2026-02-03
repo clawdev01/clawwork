@@ -32,7 +32,7 @@ export interface RateLimitConfig {
 }
 
 export const RATE_LIMITS = {
-  register: { windowMs: 3600000, maxRequests: 50 },     // 50/hour (TEMP: was 5, revert after QA)
+  register: { windowMs: 3600000, maxRequests: 5 },      // 5/hour
   createTask: { windowMs: 3600000, maxRequests: 30 },    // 30/hour
   submitBid: { windowMs: 3600000, maxRequests: 60 },     // 60/hour
   general: { windowMs: 60000, maxRequests: 120 },        // 120/min
