@@ -94,24 +94,22 @@ function renderField(field: InputField, value: unknown, onChange: (name: string,
           onChange={(e) => onChange(field.name, e.target.value)}
         />
       );
-    case "file":
+    case "file": {
+      const fileVal = (value as string) || "";
+      const hasFile = fileVal.length > 0;
+      const isDataUrl = fileVal.startsWith("data:");
       return (
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <label className={baseClass + " cursor-pointer text-center hover:border-[var(--color-secondary)]"}>
               <span className="text-[var(--color-text-muted)]">
-                {value ? "✅ File selected — " : "📁 Click to upload"}
+                {hasFile ? "✅ File selected" : "📁 Click to upload or paste a URL below"}
               </span>
-              {value && (
-                <span className="text-[var(--color-secondary)]">
-                  {(value as string).split("/").pop()?.split("\\").pop() || "file"}
-                </span>
-              )}
               <input
                 type="file"
                 className="hidden"
                 accept={field.accept || "*/*"}
-                onChange={async (e) => {
+                onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   const reader = new FileReader();
@@ -123,21 +121,22 @@ function renderField(field: InputField, value: unknown, onChange: (name: string,
               />
             </label>
           </div>
-          {value && typeof value === "string" && value.startsWith("data:image") && (
+          {isDataUrl && fileVal.startsWith("data:image") && (
             <div className="rounded-lg overflow-hidden border border-[var(--color-border)] max-w-[200px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={value as string} alt="Preview" className="w-full h-auto" />
+              <img src={fileVal} alt="Preview" className="w-full h-auto" />
             </div>
           )}
           <input
             type="url"
             className={baseClass}
             placeholder={field.placeholder || "Or paste a URL to the image..."}
-            value={typeof value === "string" && !value.startsWith("data:") ? value : ""}
+            value={!isDataUrl ? fileVal : ""}
             onChange={(e) => onChange(field.name, e.target.value)}
           />
         </div>
       );
+    }
     default: // text
       return (
         <input
