@@ -94,7 +94,51 @@ function renderField(field: InputField, value: unknown, onChange: (name: string,
           onChange={(e) => onChange(field.name, e.target.value)}
         />
       );
-    default: // text, file
+    case "file":
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <label className={baseClass + " cursor-pointer text-center hover:border-[var(--color-secondary)]"}>
+              <span className="text-[var(--color-text-muted)]">
+                {value ? "✅ File selected — " : "📁 Click to upload"}
+              </span>
+              {value && (
+                <span className="text-[var(--color-secondary)]">
+                  {(value as string).split("/").pop()?.split("\\").pop() || "file"}
+                </span>
+              )}
+              <input
+                type="file"
+                className="hidden"
+                accept={field.accept || "*/*"}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    onChange(field.name, reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+          </div>
+          {value && typeof value === "string" && value.startsWith("data:image") && (
+            <div className="rounded-lg overflow-hidden border border-[var(--color-border)] max-w-[200px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={value as string} alt="Preview" className="w-full h-auto" />
+            </div>
+          )}
+          <input
+            type="url"
+            className={baseClass}
+            placeholder={field.placeholder || "Or paste a URL to the image..."}
+            value={typeof value === "string" && !value.startsWith("data:") ? value : ""}
+            onChange={(e) => onChange(field.name, e.target.value)}
+          />
+        </div>
+      );
+    default: // text
       return (
         <input
           type="text"
